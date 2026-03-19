@@ -261,7 +261,7 @@
     document.getElementById("detail-title").textContent = item.title;
     document.getElementById("detail-toggle-read").textContent = item.read ? "Mark unread" : "Mark read";
     document.getElementById("detail-meta").textContent = formatDate(item.date);
-    document.getElementById("detail-body").innerHTML = sanitizeHTML(item.content);
+    document.getElementById("detail-body").innerHTML = sanitizeHTML(item.content, feed.url);
     var linkEl = document.getElementById("detail-link");
     if (item.link) {
       linkEl.href = item.link;
@@ -282,13 +282,24 @@
     }
   }
 
-  function sanitizeHTML(html) {
+  function resolveURL(url, feedUrl) {
+    if (!url || url.startsWith("http://") || url.startsWith("https://") || url.startsWith("data:")) {
+      return url;
+    }
+    try {
+      return new URL(url, feedUrl).href;
+    } catch (e) {
+      return url;
+    }
+  }
+
+  function sanitizeHTML(html, feedUrl) {
     var div = document.createElement("div");
     div.innerHTML = html;
     // Remove script tags
     var scripts = div.querySelectorAll("script");
     scripts.forEach(function (s) { s.remove(); });
-    // Remove event handler attributes
+    // Resolve relative URLs and sanitize
     var all = div.querySelectorAll("*");
     all.forEach(function (el) {
       var attrs = Array.from(el.attributes);
@@ -297,9 +308,16 @@
           el.removeAttribute(attr.name);
         }
       });
-      // Remove javascript: links
-      if (el.tagName === "A" && el.href && el.href.toLowerCase().startsWith("javascript:")) {
-        el.removeAttribute("href");
+      if (el.tagName === "IMG" && el.getAttribute("src")) {
+        el.setAttribute("src", resolveURL(el.getAttribute("src"), feedUrl));
+      }
+      if (el.tagName === "A" && el.getAttribute("href")) {
+        var href = el.getAttribute("href");
+        if (href.toLowerCase().startsWith("javascript:")) {
+          el.removeAttribute("href");
+        } else {
+          el.setAttribute("href", resolveURL(href, feedUrl));
+        }
       }
     });
     return div.innerHTML;
