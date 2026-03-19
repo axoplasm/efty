@@ -1,0 +1,38 @@
+# OS generated files #
+######################
+.DS_Store*
+ehthumbs.db
+Icon?
+Thumbs.db
+._*
+
+# Vim generated files #
+######################
+*.un~
+
+# editor tmp files #
+####################
+*.swp
+*.swo
+.nova/
+.claude/
+
+# bytecode #
+############
+*.pyc
+
+# development database #
+########################
+db.sqlite3
+
+# virtualenv environment #
+##########################
+Env/
+.Env/
+.env/
+venv/
+
+
+# Data files #
+##############
+/data
