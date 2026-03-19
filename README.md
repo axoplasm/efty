@@ -25,6 +25,6 @@ Technical notes
 ---------------
 
 - Static web server (no backend)
-- Can be run locally from a lightweight server like `python -m http.server`
+- Run locally with `python3 server.py` (serves static files and proxies feed requests)
 - Vanilla JS and CSS (no frontend build)
 - Store feed data in a local JSON file

@@ -9,10 +9,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Running Locally
 
 ```bash
-python -m http.server
+python3 server.py
 ```
 
-Then open `http://localhost:8000` in a browser.
+Then open `http://localhost:8000`. The server serves static files and proxies RSS feed requests to avoid CORS issues.
 
 ## Architecture
 
