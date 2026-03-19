@@ -138,6 +138,25 @@
     var list = document.getElementById("feeds-list");
     list.innerHTML = "";
 
+    // "All" entry
+    var allLi = document.createElement("li");
+    if (state.selectedFeedIndex === "all") allLi.classList.add("selected");
+    var allTitle = document.createElement("span");
+    allTitle.className = "feed-title";
+    allTitle.textContent = "All Feeds";
+    allLi.appendChild(allTitle);
+    var totalUnread = state.feeds.reduce(function (sum, f) {
+      return sum + f.items.filter(function (item) { return !item.read; }).length;
+    }, 0);
+    if (totalUnread > 0) {
+      var allBadge = document.createElement("span");
+      allBadge.className = "feed-unread-count";
+      allBadge.textContent = totalUnread;
+      allLi.appendChild(allBadge);
+    }
+    allLi.addEventListener("click", function () { selectFeed("all"); });
+    list.appendChild(allLi);
+
     state.feeds.forEach(function (feed, i) {
       var li = document.createElement("li");
       if (state.selectedFeedIndex === i) li.classList.add("selected");
@@ -173,6 +192,26 @@
     });
   }
 
+  function getPostsForSelection() {
+    if (state.selectedFeedIndex === "all") {
+      var posts = [];
+      state.feeds.forEach(function (feed) {
+        feed.items.forEach(function (item) {
+          posts.push({ item: item, feedTitle: feed.title, feedUrl: feed.url });
+        });
+      });
+      posts.sort(function (a, b) {
+        return new Date(b.item.date || 0) - new Date(a.item.date || 0);
+      });
+      return posts;
+    }
+    var feed = state.feeds[state.selectedFeedIndex];
+    if (!feed) return [];
+    return feed.items.map(function (item) {
+      return { item: item, feedTitle: feed.title, feedUrl: feed.url };
+    });
+  }
+
   function renderPosts() {
     var list = document.getElementById("posts-list");
     var titleEl = document.getElementById("posts-title");
@@ -183,17 +222,17 @@
       return;
     }
 
-    var feed = state.feeds[state.selectedFeedIndex];
-    if (!feed) return;
-    titleEl.textContent = feed.title;
+    titleEl.textContent = state.selectedFeedIndex === "all" ? "All Feeds" : state.feeds[state.selectedFeedIndex].title;
 
-    var filtered = feed.items.filter(function (item) {
-      if (state.filter === "unread") return !item.read;
-      if (state.filter === "read") return item.read;
+    var posts = getPostsForSelection();
+    var filtered = posts.filter(function (p) {
+      if (state.filter === "unread") return !p.item.read;
+      if (state.filter === "read") return p.item.read;
       return true;
     });
 
-    filtered.forEach(function (item) {
+    filtered.forEach(function (p) {
+      var item = p.item;
       var li = document.createElement("li");
       if (!item.read) li.classList.add("unread");
       if (state.selectedPostId === item.id) li.classList.add("selected");
@@ -213,12 +252,13 @@
 
       li.appendChild(titleDiv);
 
-      if (item.date) {
-        var dateDiv = document.createElement("div");
-        dateDiv.className = "post-date";
-        dateDiv.textContent = formatDate(item.date);
-        li.appendChild(dateDiv);
-      }
+      var metaLine = document.createElement("div");
+      metaLine.className = "post-date";
+      var parts = [];
+      if (item.date) parts.push(formatDate(item.date));
+      parts.push(p.feedTitle);
+      metaLine.textContent = parts.join(" · ");
+      li.appendChild(metaLine);
 
       if (item.summary) {
         var snippetDiv = document.createElement("div");
@@ -245,11 +285,8 @@
       return;
     }
 
-    var feed = state.feeds[state.selectedFeedIndex];
-    if (!feed) return;
-
-    var item = feed.items.find(function (p) { return p.id === state.selectedPostId; });
-    if (!item) {
+    var match = findPost(state.selectedPostId);
+    if (!match) {
       emptyEl.hidden = false;
       contentEl.hidden = true;
       return;
@@ -258,9 +295,11 @@
     emptyEl.hidden = true;
     contentEl.hidden = false;
 
+    var item = match.item;
+    var feed = match.feed;
     document.getElementById("detail-title").textContent = item.title;
     document.getElementById("detail-toggle-read").textContent = item.read ? "Mark unread" : "Mark read";
-    document.getElementById("detail-meta").textContent = formatDate(item.date);
+    document.getElementById("detail-meta").textContent = formatDate(item.date) + " · " + feed.title;
     document.getElementById("detail-body").innerHTML = sanitizeHTML(item.content, feed.url);
     var linkEl = document.getElementById("detail-link");
     if (item.link) {
@@ -331,23 +370,30 @@
     render();
   }
 
+  function findPost(id) {
+    for (var i = 0; i < state.feeds.length; i++) {
+      var feed = state.feeds[i];
+      var item = feed.items.find(function (p) { return p.id === id; });
+      if (item) return { item: item, feed: feed };
+    }
+    return null;
+  }
+
   function selectPost(id) {
     state.selectedPostId = id;
-    var feed = state.feeds[state.selectedFeedIndex];
-    var item = feed.items.find(function (p) { return p.id === id; });
-    if (item && !item.read) {
-      item.read = true;
+    var match = findPost(id);
+    if (match && !match.item.read) {
+      match.item.read = true;
       save();
     }
     render();
   }
 
   function toggleReadStatus() {
-    if (state.selectedFeedIndex === null || state.selectedPostId === null) return;
-    var feed = state.feeds[state.selectedFeedIndex];
-    var item = feed.items.find(function (p) { return p.id === state.selectedPostId; });
-    if (item) {
-      item.read = !item.read;
+    if (state.selectedPostId === null) return;
+    var match = findPost(state.selectedPostId);
+    if (match) {
+      match.item.read = !match.item.read;
       save();
       render();
     }

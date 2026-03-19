@@ -10,10 +10,15 @@ Features
 ### One window UI with 3 panes:
 
 1. (left) List of subscribed feeds
+    - "All Feeds" button to show posts from all feeds
+    - Unread count badges
 2. (center) Preview posts from selected feeds
-    - Filter feeds by read/unread
-3. (right) detail of selected feed post
+    - Filter by read/unread
+    - Shows feed name in each post preview
+    - "All Feeds" view sorted by date, newest first
+3. (right) Detail of selected feed post
     - Toggle read/unread
+    - Shows feed name in post metadata
 
 ### Other features:
 
