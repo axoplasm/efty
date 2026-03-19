@@ -15,7 +15,24 @@
     --selected: #e8f0fe;
     --hover: #f0f0f0;
     --danger: #c00;
+}
 
+@media (prefers-color-scheme: dark) {
+    :root {
+        --bg: #1a1a1a;
+        --surface: #242424;
+        --border: #3a3a3a;
+        --text: #e0e0e0;
+        --text-muted: #999;
+        --accent: #5b9aff;
+        --accent-hover: #4a85e6;
+        --selected: #2a3a52;
+        --hover: #2e2e2e;
+        --danger: #f55;
+    }
+}
+
+:root {
     --space: 0.5rem;
     --font-xs: 0.6875rem;
     --font-sm: 0.75rem;
@@ -421,7 +438,7 @@ main {
 
     &:focus {
         border-color: var(--accent);
-        box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+        box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 20%, transparent);
     }
 }
 
