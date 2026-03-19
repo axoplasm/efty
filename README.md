@@ -1,5 +1,5 @@
-Project Efty
-============
+Project Efty 🦎
+==============
 
 An RSS newsreader web app.
 
