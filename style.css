@@ -380,27 +380,18 @@ main {
 
 /* Modal */
 
-#modal-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.4);
-    align-items: center;
-    justify-content: center;
-    z-index: 100;
-    display: none;
-
-    &:not([hidden]) {
-        display: flex;
-    }
-}
-
-#modal {
+dialog#modal {
     background: var(--surface);
+    border: none;
     border-radius: 10px;
     padding: calc(var(--space) * 3);
     width: var(--modal-width);
     max-width: 90vw;
     box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+
+    &::backdrop {
+        background: rgba(0, 0, 0, 0.4);
+    }
 }
 
 #modal-header {

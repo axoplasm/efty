@@ -18,23 +18,23 @@
         <ul id="feeds-list"></ul>
       </aside>
       <section id="posts-pane">
-        <div id="posts-toolbar">
+        <header id="posts-toolbar">
           <h2 id="posts-title">Posts</h2>
           <select id="posts-filter">
             <option value="all">All</option>
             <option value="unread">Unread</option>
             <option value="read">Read</option>
           </select>
-        </div>
+        </header>
         <ul id="posts-list"></ul>
       </section>
       <section id="detail-pane">
-        <div id="detail-empty">Select a post to read</div>
+        <p id="detail-empty">Select a post to read</p>
         <article id="detail-content" hidden>
-          <div id="detail-header">
+          <header id="detail-header">
             <h2 id="detail-title"></h2>
             <button id="detail-toggle-read"></button>
-          </div>
+          </header>
           <p id="detail-meta"></p>
           <div id="detail-body"></div>
           <a id="detail-link" target="_blank" rel="noopener noreferrer">Open original →</a>
@@ -43,22 +43,20 @@
     </main>
   </div>
 
-  <div id="modal-overlay" hidden>
-    <div id="modal">
-      <div id="modal-header">
-        <h2>Subscribe to Feed</h2>
-        <button type="button" id="modal-close">&times;</button>
-      </div>
-      <form id="subscribe-form">
-        <input type="url" id="feed-url-input" placeholder="https://example.com/feed.xml" required>
-        <div id="modal-error" hidden></div>
-        <div id="modal-actions">
-          <button type="button" id="modal-cancel">Cancel</button>
-          <button type="submit" id="modal-submit">Subscribe</button>
-        </div>
-      </form>
-    </div>
-  </div>
+  <dialog id="modal">
+    <header id="modal-header">
+      <h2>Subscribe to Feed</h2>
+      <button type="button" id="modal-close">&times;</button>
+    </header>
+    <form id="subscribe-form">
+      <input type="url" id="feed-url-input" placeholder="https://example.com/feed.xml" required>
+      <p id="modal-error" hidden></p>
+      <footer id="modal-actions">
+        <button type="button" id="modal-cancel">Cancel</button>
+        <button type="submit" id="modal-submit">Subscribe</button>
+      </footer>
+    </form>
+  </dialog>
 
   <script type="module" src="app.js"></script>
 </body>

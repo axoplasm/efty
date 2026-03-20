@@ -1,87 +1,79 @@
 const CORS_PROXY = "/proxy?url=";
 
+/**
+ * Fetch and parse an RSS or Atom feed from the given URL via the CORS proxy.
+ * @param {string} url - The feed URL to fetch.
+ * @returns {Promise<Object>} Parsed feed object with title, url, and items.
+ */
 export function fetchFeed(url) {
-  return fetch(CORS_PROXY + encodeURIComponent(url))
-    .then(function (res) {
-      if (!res.ok) throw new Error("Network error: " + res.status);
-      return res.text();
-    })
-    .then(function (text) {
-      return parseRSS(text, url);
-    });
+    return fetch(CORS_PROXY + encodeURIComponent(url))
+        .then((res) => {
+            if (!res.ok) throw new Error("Network error: " + res.status);
+            return res.text();
+        })
+        .then((text) => parseRSS(text, url));
 }
 
 function parseRSS(text, feedUrl) {
-  var parser = new DOMParser();
-  var doc = parser.parseFromString(text, "text/xml");
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(text, "text/xml");
 
-  var errorNode = doc.querySelector("parsererror");
-  if (errorNode) throw new Error("Invalid RSS/Atom feed");
+    if (doc.querySelector("parsererror")) throw new Error("Invalid RSS/Atom feed");
 
-  // Try RSS 2.0
-  var channel = doc.querySelector("channel");
-  if (channel) {
-    return parseRSS2(channel, feedUrl);
-  }
+    // Try RSS 2.0
+    const channel = doc.querySelector("channel");
+    if (channel) return parseRSS2(channel, feedUrl);
 
-  // Try Atom
-  var atomFeed = doc.querySelector("feed");
-  if (atomFeed) {
-    return parseAtom(atomFeed, feedUrl);
-  }
+    // Try Atom
+    const atomFeed = doc.querySelector("feed");
+    if (atomFeed) return parseAtom(atomFeed, feedUrl);
 
-  throw new Error("Unrecognized feed format");
+    throw new Error("Unrecognized feed format");
 }
 
 function parseRSS2(channel, feedUrl) {
-  var titleEl = channel.querySelector(":scope > title");
-  var title = titleEl ? titleEl.textContent.trim() : feedUrl;
-  var itemEls = channel.querySelectorAll("item");
-  var items = [];
-  itemEls.forEach(function (el) {
-    items.push({
-      id: getTextContent(el, "guid") || getTextContent(el, "link") || getTextContent(el, "title"),
-      title: getTextContent(el, "title") || "Untitled",
-      link: getTextContent(el, "link") || "",
-      date: getTextContent(el, "pubDate") || "",
-      summary: stripHTML(getTextContent(el, "description") || "").slice(0, 200),
-      content: getTextContent(el, "content\\:encoded") || getTextContent(el, "description") || "",
-      read: false,
-    });
-  });
-  return { url: feedUrl, title: title, items: items };
+    const titleEl = channel.querySelector(":scope > title");
+    const title = titleEl ? titleEl.textContent.trim() : feedUrl;
+    const items = Array.from(channel.querySelectorAll("item")).map((el) => ({
+        id: getTextContent(el, "guid") || getTextContent(el, "link") || getTextContent(el, "title"),
+        title: getTextContent(el, "title") || "Untitled",
+        link: getTextContent(el, "link") || "",
+        date: getTextContent(el, "pubDate") || "",
+        summary: stripHTML(getTextContent(el, "description") || "").slice(0, 200),
+        content: getTextContent(el, "content\\:encoded") || getTextContent(el, "description") || "",
+        read: false,
+    }));
+    return { url: feedUrl, title, items };
 }
 
 function parseAtom(feed, feedUrl) {
-  var titleEl = feed.querySelector(":scope > title");
-  var title = titleEl ? titleEl.textContent.trim() : feedUrl;
-  var entryEls = feed.querySelectorAll("entry");
-  var items = [];
-  entryEls.forEach(function (el) {
-    var linkEl = el.querySelector("link[href]");
-    var link = linkEl ? linkEl.getAttribute("href") : "";
-    var contentEl = el.querySelector("content") || el.querySelector("summary");
-    var contentText = contentEl ? contentEl.textContent : "";
-    items.push({
-      id: getTextContent(el, "id") || link || getTextContent(el, "title"),
-      title: getTextContent(el, "title") || "Untitled",
-      link: link,
-      date: getTextContent(el, "updated") || getTextContent(el, "published") || "",
-      summary: stripHTML(contentText).slice(0, 200),
-      content: contentText,
-      read: false,
+    const titleEl = feed.querySelector(":scope > title");
+    const title = titleEl ? titleEl.textContent.trim() : feedUrl;
+    const items = Array.from(feed.querySelectorAll("entry")).map((el) => {
+        const linkEl = el.querySelector("link[href]");
+        const link = linkEl ? linkEl.getAttribute("href") : "";
+        const contentEl = el.querySelector("content") || el.querySelector("summary");
+        const contentText = contentEl ? contentEl.textContent : "";
+        return {
+            id: getTextContent(el, "id") || link || getTextContent(el, "title"),
+            title: getTextContent(el, "title") || "Untitled",
+            link,
+            date: getTextContent(el, "updated") || getTextContent(el, "published") || "",
+            summary: stripHTML(contentText).slice(0, 200),
+            content: contentText,
+            read: false,
+        };
     });
-  });
-  return { url: feedUrl, title: title, items: items };
+    return { url: feedUrl, title, items };
 }
 
 function getTextContent(parent, tagName) {
-  var el = parent.querySelector(tagName);
-  return el ? el.textContent.trim() : "";
+    const el = parent.querySelector(tagName);
+    return el ? el.textContent.trim() : "";
 }
 
 function stripHTML(html) {
-  var div = document.createElement("div");
-  div.innerHTML = html;
-  return div.textContent || "";
+    const div = document.createElement("div");
+    div.innerHTML = html;
+    return div.textContent || "";
 }

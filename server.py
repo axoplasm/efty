@@ -5,7 +5,6 @@ Usage: python server.py
 """
 
 import http.server
-import json
 import os
 import urllib.error
 import urllib.request
@@ -19,19 +18,24 @@ class EftyHandler(http.server.SimpleHTTPRequestHandler):
         super().__init__(*args, directory=STATIC_DIR, **kwargs)
 
     def do_GET(self):
+        """Route GET requests to the proxy handler or static file server."""
         if self.path.startswith("/proxy?url="):
             self.handle_proxy()
         else:
             super().do_GET()
 
     def handle_proxy(self):
+        """Fetch and proxy an RSS/Atom feed, forwarding headers and body."""
         url = self.path[len("/proxy?url="):]
         url = urllib.request.unquote(url)
 
         try:
             req = urllib.request.Request(url, headers={
                 "User-Agent": "Efty RSS Reader/1.0",
-                "Accept": "application/rss+xml, application/atom+xml, application/xml, text/xml",
+                "Accept": (
+                    "application/rss+xml, application/atom+xml,"
+                    " application/xml, text/xml"
+                ),
             })
             with urllib.request.urlopen(req, timeout=15) as resp:
                 body = resp.read()
@@ -49,6 +53,7 @@ class EftyHandler(http.server.SimpleHTTPRequestHandler):
             self.send_error(502, str(e))
 
     def log_message(self, format, *args):
+        """Print a compact single-line request log."""
         print(f"  {args[0]}")
 
 
