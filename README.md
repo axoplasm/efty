@@ -24,7 +24,7 @@ feeds.
 | Variable | Default | Purpose |
 |---|---|---|
 | `SECRET_KEY` | random (changes on restart) | Signs session cookies — set this in production |
-| `EFTY_DB` | `efty.db` (project root) | Path to the SQLite database file |
+| `EFTY_DB` | `db.sqlite3` (project root) | Path to the SQLite database file |
 
 
 Features

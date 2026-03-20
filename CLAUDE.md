@@ -13,7 +13,7 @@ pip install -r requirements.txt
 python server.py
 ```
 
-Then open `http://localhost:8000`. Set `SECRET_KEY` in the environment for sessions to survive restarts; set `EFTY_DB` to override the default database path (`efty.db` in the project root).
+Then open `http://localhost:8000`. Set `SECRET_KEY` in the environment for sessions to survive restarts; set `EFTY_DB` to override the default database path (`db.sqlite3` in the project root).
 
 ## Architecture
 
