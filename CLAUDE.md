@@ -6,6 +6,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Efty** is an RSS newsreader web app with a Python/Flask backend and SQLite data store. Users log in, and their feed subscriptions and read state are stored server-side per account.
 
+## Running Tests
+
+```bash
+pytest
+pytest tests/test_auth.py        # single file
+pytest -k test_register_success  # single test
+```
+
 ## Running Locally
 
 ```bash

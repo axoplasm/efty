@@ -169,30 +169,6 @@ def login_page():
 # ── Auth API ──
 
 
-@app.route("/auth/register", methods=["POST"])
-def register():
-    """Create a new user account."""
-    data = request.get_json(silent=True) or {}
-    username = data.get("username", "").strip()
-    password = data.get("password", "")
-
-    if not username or not password:
-        return jsonify({"error": "Username and password are required"}), 422
-    if len(password) < 8:
-        return jsonify({"error": "Password must be at least 8 characters"}), 422
-
-    db = get_db()
-    try:
-        db.execute(
-            "INSERT INTO users (username, password_hash) VALUES (?, ?)",
-            (username, generate_password_hash(password)),
-        )
-        db.commit()
-    except sqlite3.IntegrityError:
-        return jsonify({"error": "Username already taken"}), 409
-
-    return jsonify({"ok": True}), 201
-
 
 @app.route("/auth/login", methods=["POST"])
 def login():
