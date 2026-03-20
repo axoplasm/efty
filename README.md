@@ -9,7 +9,10 @@ Getting started
 ---------------
 
 ```
-pip install -r requirements.txt
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.in
+pip freeze > requirements.txt
 python server.py
 ```
 
