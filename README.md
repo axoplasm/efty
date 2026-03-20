@@ -1,19 +1,24 @@
 Project Efty 🦎
 ==============
 
-A static, client-side RSS newsreader. No backend, no build step, no
-framework — just vanilla HTML, JavaScript, and CSS.
+An RSS newsreader with user accounts. Built with Flask and SQLite on the
+backend, vanilla JavaScript on the frontend — no build step.
 
 
-Running locally
+Getting started
 ---------------
 
 ```
-python3 server.py
+pip install -r requirements.txt
+python server.py
 ```
 
-Open `http://localhost:8000`. The server serves static files and proxies
-feed requests to avoid CORS issues.
+Open `http://localhost:8000`, create an account, and start subscribing to
+feeds.
+
+Set `SECRET_KEY` in the environment to keep sessions alive across server
+restarts. Set `EFTY_DB` to use a custom database path (default: `efty.db`
+in the project directory).
 
 
 Features
@@ -22,11 +27,11 @@ Features
 ### Three-pane layout:
 
 1. **Left** — subscribed feeds list
-    - "All Feeds" view aggregates posts across all feeds
+    - "All Feeds" view aggregates posts across all feeds, sorted by date
     - Unread count badges per feed
+    - Refresh (↺) and unsubscribe (×) buttons on hover
 2. **Center** — post previews for the selected feed
     - Filter by all / unread / read
-    - "All Feeds" view sorted by date, newest first
 3. **Right** — full post detail
     - Toggle read/unread
     - "Open original" link to source
@@ -34,12 +39,13 @@ Features
 ### Subscribing:
 
 Click **+ Subscribe**, enter an RSS or Atom feed URL, and press Subscribe.
-Feed data (including read state) is stored in `localStorage`.
+Feed data and read state are stored per user account in SQLite.
 
 
 Technical notes
 ---------------
 
-- No backend server, no build tooling, no third-party libraries
-- Feed parsing supports RSS 2.0 and Atom
-- Source is split into ES modules: `storage.js`, `parser.js`, `render.js`, `app.js`
+- Python/Flask backend, SQLite data store, no ORM
+- Feed parsing via `feedparser` (RSS 2.0 and Atom)
+- Frontend is vanilla JS ES modules: `api.js`, `render.js`, `app.js`
+- No frontend build tooling

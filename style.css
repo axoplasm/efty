@@ -78,6 +78,12 @@ header {
     }
 }
 
+#header-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space);
+}
+
 #subscribe-btn {
     padding: calc(var(--space) * 0.75) calc(var(--space) * 1.75);
     background: var(--accent);
@@ -90,6 +96,22 @@ header {
 
     &:hover {
         background: var(--accent-hover);
+    }
+}
+
+#logout-btn {
+    padding: calc(var(--space) * 0.75) calc(var(--space) * 1.75);
+    font-size: var(--font-sm);
+    font-weight: 600;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface);
+    color: var(--text-muted);
+    cursor: pointer;
+
+    &:hover {
+        background: var(--hover);
+        color: var(--text);
     }
 }
 
@@ -138,7 +160,7 @@ main {
         &:hover {
             background: var(--hover);
 
-            .feed-remove {
+            .feed-remove, .feed-refresh {
                 visibility: visible;
             }
         }
@@ -165,8 +187,23 @@ main {
     flex-shrink: 0;
 }
 
+.feed-refresh {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: var(--font-md);
+    padding: 0 2px;
+    flex-shrink: 0;
+    visibility: hidden;
+
+    &:hover {
+        color: var(--accent);
+    }
+}
+
 .feed-remove {
-    margin-inline-start: calc(var(--space) * 0.75);
+    margin-inline-start: calc(var(--space) * 0.25);
     background: none;
     border: none;
     color: var(--text-muted);
@@ -484,4 +521,107 @@ dialog#modal {
     padding: calc(var(--space) * 2.5);
     color: var(--text-muted);
     font-size: var(--font-sm);
+}
+
+/* Login / register page */
+
+body.login {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: auto;
+}
+
+#login-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.1);
+    padding: calc(var(--space) * 4);
+    width: 22rem;
+    max-width: 90vw;
+
+    h1 {
+        font-size: var(--font-xl);
+        text-align: center;
+        margin-bottom: calc(var(--space) * 2.5);
+    }
+}
+
+#auth-tabs {
+    display: flex;
+    gap: calc(var(--space) * 0.5);
+    border-bottom: 1px solid var(--border);
+    margin-bottom: calc(var(--space) * 2);
+    padding-bottom: var(--space);
+
+    .tab {
+        background: none;
+        border: none;
+        font-size: var(--font-md);
+        color: var(--text-muted);
+        cursor: pointer;
+        padding: calc(var(--space) * 0.5) var(--space);
+        border-radius: 4px;
+
+        &.selected {
+            color: var(--accent);
+            font-weight: 600;
+        }
+
+        &:hover:not(.selected) {
+            color: var(--text);
+        }
+    }
+}
+
+#login-form, #register-form {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--space) * 0.75);
+
+    label {
+        font-size: var(--font-sm);
+        font-weight: 600;
+        color: var(--text-muted);
+        margin-top: calc(var(--space) * 0.5);
+    }
+
+    input {
+        width: 100%;
+        padding: var(--space) calc(var(--space) * 1.25);
+        font-size: var(--font-md);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        background: var(--surface);
+        color: var(--text);
+        outline: none;
+
+        &:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 20%, transparent);
+        }
+    }
+
+    p {
+        font-size: var(--font-sm);
+        color: var(--danger);
+        min-height: 1em;
+    }
+
+    button[type="submit"] {
+        margin-top: var(--space);
+        padding: calc(var(--space) * 0.875) calc(var(--space) * 1.75);
+        background: var(--accent);
+        color: #fff;
+        border: none;
+        border-radius: 6px;
+        font-size: var(--font-md);
+        font-weight: 600;
+        cursor: pointer;
+
+        &:hover {
+            background: var(--accent-hover);
+        }
+    }
 }

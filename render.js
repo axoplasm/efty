@@ -3,7 +3,7 @@
 /**
  * Find a post by ID across all feeds.
  * @param {Array} feeds
- * @param {string} id
+ * @param {number} id - The item's database ID.
  * @returns {{item: Object, feed: Object}|null}
  */
 export function findPost(feeds, id) {
@@ -19,7 +19,7 @@ export function findPost(feeds, id) {
 /**
  * Re-render all three panes.
  * @param {Object} state
- * @param {Object} callbacks - { selectFeed, selectPost, removeFeed }
+ * @param {Object} callbacks - { selectFeed, selectPost, removeFeed, refreshFeed }
  */
 export function render(state, callbacks) {
     renderFeeds(state, callbacks);
@@ -38,7 +38,7 @@ export function renderFeeds(state, callbacks) {
 
     // "All" entry
     const allLi = document.createElement("li");
-    if (state.selectedFeedIndex === "all") allLi.classList.add("selected");
+    if (state.selectedFeedId === "all") allLi.classList.add("selected");
     const allTitle = document.createElement("span");
     allTitle.className = "feed-title";
     allTitle.textContent = "All Feeds";
@@ -56,9 +56,9 @@ export function renderFeeds(state, callbacks) {
     allLi.addEventListener("click", () => callbacks.selectFeed("all"));
     list.appendChild(allLi);
 
-    state.feeds.forEach((feed, i) => {
+    for (const feed of state.feeds) {
         const li = document.createElement("li");
-        if (state.selectedFeedIndex === i) li.classList.add("selected");
+        if (state.selectedFeedId === feed.id) li.classList.add("selected");
 
         const titleSpan = document.createElement("span");
         titleSpan.className = "feed-title";
@@ -73,19 +73,29 @@ export function renderFeeds(state, callbacks) {
             li.appendChild(badge);
         }
 
+        const refreshBtn = document.createElement("button");
+        refreshBtn.className = "feed-refresh";
+        refreshBtn.textContent = "\u21ba";
+        refreshBtn.title = "Refresh";
+        refreshBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            callbacks.refreshFeed(feed.id);
+        });
+        li.appendChild(refreshBtn);
+
         const removeBtn = document.createElement("button");
         removeBtn.className = "feed-remove";
         removeBtn.textContent = "\u00d7";
         removeBtn.title = "Unsubscribe";
         removeBtn.addEventListener("click", (e) => {
             e.stopPropagation();
-            callbacks.removeFeed(i);
+            callbacks.removeFeed(feed.id);
         });
         li.appendChild(removeBtn);
 
-        li.addEventListener("click", () => callbacks.selectFeed(i));
+        li.addEventListener("click", () => callbacks.selectFeed(feed.id));
         list.appendChild(li);
-    });
+    }
 }
 
 /**
@@ -98,14 +108,15 @@ export function renderPosts(state, callbacks) {
     const titleEl = document.getElementById("posts-title");
     list.innerHTML = "";
 
-    if (state.selectedFeedIndex === null) {
+    if (state.selectedFeedId === null) {
         titleEl.textContent = "Posts";
         return;
     }
 
-    titleEl.textContent = state.selectedFeedIndex === "all"
+    const selectedFeed = state.feeds.find((f) => f.id === state.selectedFeedId);
+    titleEl.textContent = state.selectedFeedId === "all"
         ? "All Feeds"
-        : state.feeds[state.selectedFeedIndex].title;
+        : (selectedFeed?.title ?? "");
 
     const posts = getPostsForSelection(state);
     const filtered = posts.filter((p) => {
@@ -163,7 +174,7 @@ export function renderDetail(state, callbacks) {
     const emptyEl = document.getElementById("detail-empty");
     const contentEl = document.getElementById("detail-content");
 
-    if (state.selectedFeedIndex === null || state.selectedPostId === null) {
+    if (state.selectedFeedId === null || state.selectedPostId === null) {
         emptyEl.hidden = false;
         contentEl.hidden = true;
         return;
@@ -200,14 +211,14 @@ export function renderDetail(state, callbacks) {
 // ── Private helpers ──
 
 function getPostsForSelection(state) {
-    if (state.selectedFeedIndex === "all") {
+    if (state.selectedFeedId === "all") {
         const posts = state.feeds.flatMap((feed) =>
             feed.items.map((item) => ({ item, feedTitle: feed.title, feedUrl: feed.url }))
         );
         posts.sort((a, b) => new Date(b.item.date || 0) - new Date(a.item.date || 0));
         return posts;
     }
-    const feed = state.feeds[state.selectedFeedIndex];
+    const feed = state.feeds.find((f) => f.id === state.selectedFeedId);
     if (!feed) return [];
     return feed.items.map((item) => ({ item, feedTitle: feed.title, feedUrl: feed.url }));
 }
@@ -217,7 +228,9 @@ function formatDate(dateStr) {
     try {
         const d = new Date(dateStr);
         if (isNaN(d.getTime())) return dateStr;
-        return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+        return d.toLocaleDateString(undefined, {
+            year: "numeric", month: "short", day: "numeric",
+        });
     } catch (e) {
         return dateStr;
     }

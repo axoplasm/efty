@@ -1,20 +1,20 @@
-import { save, load } from "./storage.js";
-import { fetchFeed } from "./parser.js";
+import * as api from "./api.js";
 import { render, renderPosts, findPost } from "./render.js";
 
 // ── State ──
 
-// feeds: [{ url, title, items: [{ id, title, link, date, summary, content, read }] }]
+// feeds: [{ id, url, title, items: [{ id, guid, title, link, date, summary, content, read }] }]
+// selectedFeedId: integer feed DB id, "all", or null
 const state = {
     feeds: [],
-    selectedFeedIndex: null,
+    selectedFeedId: null,
     selectedPostId: null,
     filter: "all",
 };
 
 // Callbacks passed into render functions so they can trigger actions without
 // importing app.js (which would create a circular dependency).
-const callbacks = { selectFeed, selectPost, removeFeed };
+const callbacks = { selectFeed, selectPost, removeFeed, refreshFeed };
 
 function rerender() {
     render(state, callbacks);
@@ -22,8 +22,8 @@ function rerender() {
 
 // ── Actions ──
 
-function selectFeed(index) {
-    state.selectedFeedIndex = index;
+function selectFeed(feedId) {
+    state.selectedFeedId = feedId;
     state.selectedPostId = null;
     rerender();
 }
@@ -33,7 +33,7 @@ function selectPost(id) {
     const match = findPost(state.feeds, id);
     if (match && !match.item.read) {
         match.item.read = true;
-        save(state.feeds);
+        api.setItemRead(match.item.id, true);  // optimistic — fire and forget
     }
     rerender();
 }
@@ -43,28 +43,40 @@ function toggleReadStatus() {
     const match = findPost(state.feeds, state.selectedPostId);
     if (match) {
         match.item.read = !match.item.read;
-        save(state.feeds);
+        api.setItemRead(match.item.id, match.item.read);
         rerender();
     }
 }
 
-function removeFeed(index) {
-    state.feeds.splice(index, 1);
-    if (state.selectedFeedIndex === index) {
-        state.selectedFeedIndex = null;
-        state.selectedPostId = null;
-    } else if (state.selectedFeedIndex !== null && state.selectedFeedIndex > index) {
-        state.selectedFeedIndex--;
+function removeFeed(feedId) {
+    // Optimistic update — remove from local state immediately.
+    const index = state.feeds.findIndex((f) => f.id === feedId);
+    if (index !== -1) {
+        state.feeds.splice(index, 1);
+        if (state.selectedFeedId === feedId) {
+            state.selectedFeedId = null;
+            state.selectedPostId = null;
+        }
+        rerender();
     }
-    save(state.feeds);
+    api.removeFeed(feedId);
+}
+
+async function refreshFeed(feedId) {
+    const { feed, error } = await api.refreshFeed(feedId);
+    if (error) {
+        console.error("Refresh failed:", error);
+        return;
+    }
+    const index = state.feeds.findIndex((f) => f.id === feedId);
+    if (index !== -1) state.feeds[index] = feed;
     rerender();
 }
 
-function subscribeFeed(url) {
+async function subscribeFeed(url) {
     const errorEl = document.getElementById("modal-error");
     const submitBtn = document.getElementById("modal-submit");
 
-    // Check for duplicates
     if (state.feeds.some((f) => f.url === url)) {
         errorEl.textContent = "Already subscribed to this feed.";
         errorEl.hidden = false;
@@ -75,23 +87,21 @@ function subscribeFeed(url) {
     submitBtn.textContent = "Loading\u2026";
     errorEl.hidden = true;
 
-    fetchFeed(url)
-        .then((feed) => {
-            state.feeds.push(feed);
-            state.selectedFeedIndex = state.feeds.length - 1;
-            state.selectedPostId = null;
-            save(state.feeds);
-            rerender();
-            closeModal();
-        })
-        .catch((err) => {
-            errorEl.textContent = "Failed to load feed: " + err.message;
-            errorEl.hidden = false;
-        })
-        .finally(() => {
-            submitBtn.disabled = false;
-            submitBtn.textContent = "Subscribe";
-        });
+    const { feed, error } = await api.addFeed(url);
+    submitBtn.disabled = false;
+    submitBtn.textContent = "Subscribe";
+
+    if (error) {
+        errorEl.textContent = error;
+        errorEl.hidden = false;
+        return;
+    }
+
+    state.feeds.push(feed);
+    state.selectedFeedId = feed.id;
+    state.selectedPostId = null;
+    rerender();
+    closeModal();
 }
 
 // ── Modal ──
@@ -109,15 +119,14 @@ function closeModal() {
 
 // ── Event Binding ──
 
-function init() {
-    const stored = load();
-    if (stored) state.feeds = stored;
+async function init() {
+    state.feeds = await api.getFeeds();
+    rerender();
 
     document.getElementById("subscribe-btn").addEventListener("click", openModal);
+    document.getElementById("logout-btn").addEventListener("click", () => api.logout());
     document.getElementById("modal-cancel").addEventListener("click", closeModal);
     document.getElementById("modal-close").addEventListener("click", closeModal);
-
-    // Close when clicking the dialog backdrop (target is the <dialog> itself)
     document.getElementById("modal").addEventListener("click", (e) => {
         if (e.target === e.currentTarget) closeModal();
     });
@@ -134,8 +143,6 @@ function init() {
     });
 
     document.getElementById("detail-toggle-read").addEventListener("click", toggleReadStatus);
-
-    rerender();
 }
 
 init();

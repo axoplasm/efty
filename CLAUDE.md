@@ -4,57 +4,74 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Efty** is a static, client-side RSS newsreader web app. No backend, no build step, no framework — just vanilla HTML, JavaScript, and CSS served from a lightweight HTTP server.
+**Efty** is an RSS newsreader web app with a Python/Flask backend and SQLite data store. Users log in, and their feed subscriptions and read state are stored server-side per account.
 
 ## Running Locally
 
 ```bash
-python3 server.py
+pip install -r requirements.txt
+python server.py
 ```
 
-Then open `http://localhost:8000`. The server serves static files and proxies RSS feed requests to avoid CORS issues.
+Then open `http://localhost:8000`. Set `SECRET_KEY` in the environment for sessions to survive restarts; set `EFTY_DB` to override the default database path (`efty.db` in the project root).
 
 ## Architecture
 
 **Three-pane layout:**
-- Left — subscribed feed list
+- Left — subscribed feed list (with refresh ↺ and unsubscribe × buttons on hover)
 - Center — post previews for the selected feed (filterable by read/unread)
 - Right — full post detail with read/unread toggle
 
-**Feed subscription** is triggered via a `<dialog>` modal that accepts an RSS or Atom feed URL.
+**Auth**: Session-based, cookie-backed. Flask's signed session cookie stores `user_id`. All `/api/*` routes require a valid session and return `401` otherwise; the frontend redirects to `/login` on 401.
 
-**Data persistence** uses `localStorage` (key `efty_data`). No database, no server-side state.
+**Static file serving**: Flask serves `index.html` at `/`, `login.html` at `/login`, and a whitelist of JS/CSS assets. Python source files are not accessible.
 
-**Constraints to preserve:**
-- No backend server
-- No frontend build tooling (no bundler, no transpiler, no npm)
-- No third-party JS/CSS frameworks or libraries
+## Database
+
+SQLite via Python's `sqlite3`. Schema in `schema.sql`, initialized automatically on startup by `init_db()` in `server.py`. Three tables:
+
+| Table | Key columns |
+|---|---|
+| `users` | `id`, `username`, `password_hash` (Werkzeug PBKDF2) |
+| `feeds` | `id`, `user_id`, `url`, `title` — `UNIQUE(user_id, url)` |
+| `items` | `id`, `feed_id`, `guid`, `title`, `link`, `date`, `summary`, `content`, `read` — `UNIQUE(feed_id, guid)` |
+
+Feeds and items are per-user. `INSERT OR IGNORE` on guid prevents duplicate items when a feed is refreshed.
+
+## API Endpoints
+
+| Method | Path | Purpose |
+|---|---|---|
+| `POST` | `/auth/register` | Create account |
+| `POST` | `/auth/login` | Start session |
+| `POST` | `/auth/logout` | Clear session |
+| `GET` | `/api/feeds` | All feeds + items for current user |
+| `POST` | `/api/feeds` | Subscribe to a feed URL (fetches + parses) |
+| `DELETE` | `/api/feeds/<id>` | Unsubscribe |
+| `POST` | `/api/feeds/<id>/refresh` | Re-fetch items from source |
+| `PATCH` | `/api/items/<id>` | Update `read` status `{ "read": bool }` |
+
+Feed responses shape: `{ id, url, title, items: [{ id, guid, title, link, date, summary, content, read }] }`.
 
 ## Module Structure
 
-The app is split into ES modules loaded via `<script type="module">`:
-
-| Module | Responsibility |
+| File | Responsibility |
 |---|---|
-| `storage.js` | `save(feeds)`, `load()` — localStorage only |
-| `parser.js` | `fetchFeed(url)` — fetch + RSS 2.0 / Atom parsing |
-| `render.js` | `render/renderFeeds/renderPosts/renderDetail(state, callbacks)`, `findPost(feeds, id)` |
-| `app.js` | State, actions, modal, event binding — entry point |
+| `server.py` | Flask app — all routes, feed fetching via `feedparser`, DB access |
+| `schema.sql` | SQLite DDL |
+| `api.js` | Frontend API client — wraps all fetch calls, handles 401 redirect |
+| `render.js` | DOM rendering; `findPost(feeds, id)`, `render/renderFeeds/renderPosts/renderDetail(state, callbacks)` |
+| `app.js` | State, actions, event binding — entry point |
+| `login.js` | Login/register page logic |
 
 ## Key Implementation Details
 
-**State model** (`app.js`): A single `state` object holds `feeds[]`, `selectedFeedIndex` (integer, `"all"`, or `null`), `selectedPostId`, and `filter`. All mutations go through action functions that call `save()` then `rerender()`.
+**State model** (`app.js`): A single `state` object holds `feeds[]`, `selectedFeedId` (integer feed DB id, `"all"`, or `null`), `selectedPostId` (integer item DB id or `null`), and `filter`. All feed/item mutations are async API calls; UI state updates are optimistic (update state immediately, fire API call in background).
 
-**Persistence**: `localStorage` under key `efty_data`. Stores feed URLs, titles, and all item fields including `read` status. UI state (`selectedFeedIndex`, `selectedPostId`, `filter`) resets on page load.
+**Render/action decoupling**: Render functions accept a `callbacks` object `{ selectFeed, selectPost, removeFeed, refreshFeed }` instead of importing from `app.js`, avoiding a circular dependency. `findPost(feeds, id)` is exported from `render.js` and used by both `render.js` and `app.js`.
 
-**Feed parsing**: Supports RSS 2.0 (`<channel>`) and Atom (`<feed>`). Post IDs use `<guid>` → `<link>` → `<title>` fallback chain (RSS) or `<id>` → `<link>` → `<title>` (Atom). Items are normalized to `{ id, title, link, date, summary, content, read }`.
+**Feed refresh strategy**: On-demand only — no background refresh. Items are fetched when a feed is first added (`POST /api/feeds`) or explicitly refreshed (`POST /api/feeds/<id>/refresh`). The refresh button (↺) appears on hover in the feeds list.
 
-**Render/action decoupling**: Render functions accept a `callbacks` object `{ selectFeed, selectPost, removeFeed }` rather than importing from `app.js`, avoiding a circular dependency. `findPost` is exported from `render.js` and imported by both `render.js` and `app.js`.
+**HTML sanitization** (`sanitizeHTML` in `render.js`): Strips `<script>` tags and `on*` attributes, blocks `javascript:` hrefs, resolves relative URLs against the feed's base URL before setting `innerHTML`.
 
-**HTML sanitization** (`sanitizeHTML` in `render.js`): Strips `<script>` tags and `on*` attributes, blocks `javascript:` hrefs, and resolves relative URLs against the feed's base URL before setting `innerHTML` in the detail pane.
-
-**CORS proxy**: All feed fetches go through `/proxy?url=…` on the local Python server (`server.py`). Dev-only — there is no production deployment mechanism.
-
-**Rendering**: Fully imperative — each `render*()` function clears and rebuilds its DOM section from scratch. No virtual DOM or diffing.
-
-**Modal**: Uses native `<dialog>` with `showModal()` / `close()`. The backdrop is styled via `dialog#modal::backdrop`.
+**Modal**: Native `<dialog>` with `showModal()` / `close()`. Backdrop styled via `dialog#modal::backdrop`.
