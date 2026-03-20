@@ -9,26 +9,23 @@ import urllib.request
 import feedparser
 from flask import (
     Flask,
-    abort,
     g,
     jsonify,
     redirect,
+    render_template,
     request,
-    send_from_directory,
     session,
 )
 from werkzeug.security import check_password_hash, generate_password_hash
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = os.environ.get("EFTY_DB", os.path.join(BASE_DIR, "efty.db"))
+DB_PATH = os.environ.get("EFTY_DB", os.path.join(BASE_DIR, "db.sqlite3"))
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", os.urandom(32))
 
 if not os.environ.get("SECRET_KEY"):
     print("Warning: SECRET_KEY not set — sessions will not persist across restarts.")
-
-_STATIC = {"app.js", "api.js", "render.js", "login.js", "style.css"}
 
 # ── Database ──
 
@@ -158,7 +155,7 @@ def index():
     """Serve the main app, or redirect to /login if not authenticated."""
     if "user_id" not in session:
         return redirect("/login")
-    return send_from_directory(BASE_DIR, "index.html")
+    return render_template("index.html")
 
 
 @app.route("/login")
@@ -166,15 +163,7 @@ def login_page():
     """Serve the login/register page."""
     if "user_id" in session:
         return redirect("/")
-    return send_from_directory(BASE_DIR, "login.html")
-
-
-@app.route("/<path:filename>")
-def static_files(filename):
-    """Serve whitelisted static assets."""
-    if filename in _STATIC:
-        return send_from_directory(BASE_DIR, filename)
-    abort(404)
+    return render_template("login.html")
 
 
 # ── Auth API ──

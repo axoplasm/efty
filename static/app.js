@@ -1,5 +1,5 @@
-import * as api from "./api.js";
-import { render, renderPosts, findPost } from "./render.js";
+import * as api from "/static/api.js";
+import { render, renderPosts, findPost } from "/static/render.js";
 
 // ── State ──
 
