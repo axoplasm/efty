@@ -16,7 +16,7 @@ from flask import (
     request,
     session,
 )
-from werkzeug.security import check_password_hash, generate_password_hash
+from werkzeug.security import check_password_hash
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.environ.get("EFTY_DB", os.path.join(BASE_DIR, "db.sqlite3"))

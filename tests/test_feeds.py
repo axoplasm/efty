@@ -60,16 +60,19 @@ def test_remove_feed_not_found(auth):
     assert res.status_code == 404
 
 
-def test_feeds_are_isolated_between_users(client, mock_fetch):
+def test_feeds_are_isolated_between_users(app, client, mock_fetch):
     """One user cannot see another user's feeds."""
-    # Register and subscribe as alice.
-    client.post("/auth/register", json={"username": "alice", "password": "password123"})
+    from conftest import insert_user
+    import server
+    insert_user(server.DB_PATH, "alice", "password123")
+    insert_user(server.DB_PATH, "bob", "password123")
+
+    # Subscribe as alice.
     client.post("/auth/login", json={"username": "alice", "password": "password123"})
     client.post("/api/feeds", json={"url": "https://example.com/feed.xml"})
     client.post("/auth/logout")
 
     # Log in as bob — should see no feeds.
-    client.post("/auth/register", json={"username": "bob", "password": "password123"})
     client.post("/auth/login", json={"username": "bob", "password": "password123"})
     res = client.get("/api/feeds")
     assert res.get_json() == []

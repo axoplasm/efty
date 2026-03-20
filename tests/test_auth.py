@@ -1,49 +1,20 @@
 """Tests for authentication endpoints."""
 
-
-def test_register_success(client):
-    """A new user can register."""
-    res = client.post("/auth/register", json={
-        "username": "bob",
-        "password": "password123",
-    })
-    assert res.status_code == 201
-    assert res.get_json()["ok"] is True
+from conftest import insert_user
+import server
 
 
-def test_register_duplicate(client):
-    """Registering with a taken username returns 409."""
-    client.post("/auth/register", json={"username": "bob", "password": "password123"})
-    res = client.post("/auth/register", json={"username": "bob", "password": "password123"})
-    assert res.status_code == 409
-
-
-def test_register_missing_fields(client):
-    """Omitting username or password returns 422."""
-    res = client.post("/auth/register", json={"username": "bob"})
-    assert res.status_code == 422
-
-    res = client.post("/auth/register", json={"password": "password123"})
-    assert res.status_code == 422
-
-
-def test_register_short_password(client):
-    """Passwords shorter than 8 characters are rejected."""
-    res = client.post("/auth/register", json={"username": "bob", "password": "short"})
-    assert res.status_code == 422
-
-
-def test_login_success(client):
-    """A registered user can log in."""
-    client.post("/auth/register", json={"username": "bob", "password": "password123"})
+def test_login_success(app, client):
+    """A user created via CLI can log in."""
+    insert_user(server.DB_PATH, "bob", "password123")
     res = client.post("/auth/login", json={"username": "bob", "password": "password123"})
     assert res.status_code == 200
     assert res.get_json()["ok"] is True
 
 
-def test_login_wrong_password(client):
+def test_login_wrong_password(app, client):
     """A wrong password returns 401."""
-    client.post("/auth/register", json={"username": "bob", "password": "password123"})
+    insert_user(server.DB_PATH, "bob", "password123")
     res = client.post("/auth/login", json={"username": "bob", "password": "wrongpassword"})
     assert res.status_code == 401
 

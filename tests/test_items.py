@@ -56,17 +56,20 @@ def test_mark_item_not_found(auth):
     assert res.status_code == 404
 
 
-def test_cannot_mark_another_users_item(client, mock_fetch):
+def test_cannot_mark_another_users_item(app, client, mock_fetch):
     """A user cannot update read status on another user's items."""
+    from conftest import insert_user
+    import server
+    insert_user(server.DB_PATH, "alice", "password123")
+    insert_user(server.DB_PATH, "bob", "password123")
+
     # Alice subscribes and gets an item id.
-    client.post("/auth/register", json={"username": "alice", "password": "password123"})
     client.post("/auth/login", json={"username": "alice", "password": "password123"})
     res = client.post("/api/feeds", json={"url": "https://example.com/feed.xml"})
     alice_item_id = res.get_json()["items"][0]["id"]
     client.post("/auth/logout")
 
     # Bob tries to mark Alice's item as read.
-    client.post("/auth/register", json={"username": "bob", "password": "password123"})
     client.post("/auth/login", json={"username": "bob", "password": "password123"})
     res = client.patch(f"/api/items/{alice_item_id}", json={"read": True})
     assert res.status_code == 404

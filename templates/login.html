@@ -9,10 +9,6 @@
 <body class="login">
   <section id="login-card">
     <h1>Efty 🦎</h1>
-    <nav id="auth-tabs">
-      <button class="tab selected" data-tab="login">Sign in</button>
-      <button class="tab" data-tab="register">Register</button>
-    </nav>
 
     <form id="login-form">
       <label for="login-username">Username</label>
@@ -23,17 +19,6 @@
              required autocomplete="current-password">
       <p id="login-error" hidden></p>
       <button type="submit">Sign in</button>
-    </form>
-
-    <form id="register-form" hidden>
-      <label for="reg-username">Username</label>
-      <input type="text" id="reg-username" name="username"
-             required autocomplete="username">
-      <label for="reg-password">Password</label>
-      <input type="password" id="reg-password" name="password"
-             required autocomplete="new-password" minlength="8">
-      <p id="register-error" hidden></p>
-      <button type="submit">Create account</button>
     </form>
   </section>
 

@@ -2,6 +2,7 @@
 
 import sqlite3
 import pytest
+from werkzeug.security import generate_password_hash
 
 import server
 
@@ -56,17 +57,22 @@ def client(app):
     return app.test_client()
 
 
+def insert_user(db_path, username, password):
+    """Insert a user directly into the database (used by tests instead of HTTP register)."""
+    db = sqlite3.connect(db_path)
+    db.execute(
+        "INSERT INTO users (username, password_hash) VALUES (?, ?)",
+        (username, generate_password_hash(password)),
+    )
+    db.commit()
+    db.close()
+
+
 @pytest.fixture()
-def auth(client):
-    """Helper that registers and logs in a test user, returning the client."""
-    client.post("/auth/register", json={
-        "username": "alice",
-        "password": "password123",
-    })
-    client.post("/auth/login", json={
-        "username": "alice",
-        "password": "password123",
-    })
+def auth(app, client):
+    """Create a test user directly in the DB and log in, returning the client."""
+    insert_user(server.DB_PATH, "alice", "password123")
+    client.post("/auth/login", json={"username": "alice", "password": "password123"})
     return client
 
 
