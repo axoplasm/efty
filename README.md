@@ -128,3 +128,9 @@ State is a single object (`feeds[]`, `selectedFeedId`, `selectedPostId`,
 `filter`). UI updates are optimistic — state mutates immediately, then the
 API call fires in the background. Feed items are fetched on first subscribe
 or on explicit refresh; there is no automatic background refresh.
+
+
+Deployment
+----------
+
+`deployment.md` has instructions for deploying to a generic Ubuntu server.
