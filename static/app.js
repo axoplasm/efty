@@ -1,5 +1,5 @@
 import * as api from "/static/api.js";
-import { render, renderPosts, findPost } from "/static/render.js";
+import { render, renderPosts, findPost, findNextPost } from "/static/render.js";
 
 // ── State ──
 
@@ -36,6 +36,8 @@ function selectPost(id) {
         api.setItemRead(match.item.id, true);  // optimistic — fire and forget
     }
     rerender();
+    document.getElementById("detail-pane").scrollTop = 0;
+    resetOverscroll();
 }
 
 function toggleReadStatus() {
@@ -104,6 +106,106 @@ async function subscribeFeed(url) {
     closeModal();
 }
 
+// ── Scroll-past-end to advance ──
+//
+// Reaching the bottom of an article doesn't advance on its own: the article
+// "sticks", and the reader has to deliberately keep scrolling past the end.
+// Scrolling only counts once the gesture that reached the bottom has stopped
+// (so trackpad momentum can't carry straight into the next post), and a push
+// that stops short of the threshold snaps back to zero.
+
+// How close (in px) to the bottom of the detail pane counts as "reached the end".
+const SCROLL_END_SLOP = 4;
+// How far (in px) past the end the reader must scroll to open the next post.
+const OVERSCROLL_THRESHOLD = 200;
+// A pause this long (in ms) ends a scroll gesture.
+const GESTURE_IDLE_MS = 200;
+
+const overscroll = {
+    armed: false,   // true once a gesture has come to rest at the end
+    distance: 0,    // how far past the end the current gesture has pushed
+    idleTimer: null,
+    touchY: null,
+};
+
+function isAtEnd(pane) {
+    return pane.scrollTop + pane.clientHeight >= pane.scrollHeight - SCROLL_END_SLOP;
+}
+
+function setOverscroll(distance) {
+    overscroll.distance = distance;
+    document.getElementById("detail-next-progress").value =
+        Math.min(distance / OVERSCROLL_THRESHOLD, 1);
+}
+
+function resetOverscroll() {
+    overscroll.armed = false;
+    setOverscroll(0);
+}
+
+/**
+ * Account for a downward (positive) or upward (negative) scroll attempt on
+ * the detail pane, opening the next post once enough has built up past the end.
+ * @param {HTMLElement} pane - The detail pane.
+ * @param {number} delta - Scroll distance in px.
+ */
+function nudgeDetail(pane, delta) {
+    clearTimeout(overscroll.idleTimer);
+    overscroll.idleTimer = setTimeout(() => {
+        overscroll.armed = isAtEnd(pane);
+        setOverscroll(0);
+    }, GESTURE_IDLE_MS);
+
+    if (delta <= 0 || !isAtEnd(pane)) {
+        resetOverscroll();
+        return;
+    }
+    if (!overscroll.armed) return;
+
+    setOverscroll(overscroll.distance + delta);
+    if (overscroll.distance >= OVERSCROLL_THRESHOLD) openNextPost();
+}
+
+/** Open the post after the selected one and scroll it into view in the list. */
+function openNextPost() {
+    resetOverscroll();
+    const next = findNextPost(state);
+    if (!next) return;
+    selectPost(next.id);
+    // With the "unread" filter the newly read post drops out of the list, so
+    // there may be nothing to scroll to.
+    document.querySelector(`#posts-list li[data-id="${next.id}"]`)
+        ?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+}
+
+/**
+ * Convert a wheel event's delta to px.
+ * @param {WheelEvent} e
+ * @returns {number}
+ */
+function wheelDeltaPx(e) {
+    if (e.deltaMode === WheelEvent.DOM_DELTA_LINE) return e.deltaY * 16;
+    if (e.deltaMode === WheelEvent.DOM_DELTA_PAGE) {
+        return e.deltaY * e.currentTarget.clientHeight;
+    }
+    return e.deltaY;
+}
+
+function bindOverscroll() {
+    const pane = document.getElementById("detail-pane");
+    pane.addEventListener("wheel", (e) => nudgeDetail(pane, wheelDeltaPx(e)), {
+        passive: true,
+    });
+    pane.addEventListener("touchstart", (e) => {
+        overscroll.touchY = e.touches[0].clientY;
+    }, { passive: true });
+    pane.addEventListener("touchmove", (e) => {
+        const y = e.touches[0].clientY;
+        nudgeDetail(pane, overscroll.touchY - y);
+        overscroll.touchY = y;
+    }, { passive: true });
+}
+
 // ── Modal ──
 
 function openModal() {
@@ -143,6 +245,8 @@ async function init() {
     });
 
     document.getElementById("detail-toggle-read").addEventListener("click", toggleReadStatus);
+    bindOverscroll();
+    document.getElementById("detail-next-title").addEventListener("click", openNextPost);
 }
 
 init();

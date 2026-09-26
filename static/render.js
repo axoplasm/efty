@@ -1,4 +1,4 @@
-// ── Exported query helper (also used by app.js actions) ──
+// ── Exported query helpers (also used by app.js actions) ──
 
 /**
  * Find a post by ID across all feeds.
@@ -12,6 +12,23 @@ export function findPost(feeds, id) {
         if (item) return { item, feed };
     }
     return null;
+}
+
+/**
+ * Find the post listed after the selected one, respecting the current filter.
+ * The selected post itself may have been filtered out (e.g. marked read while
+ * the "unread" filter is on), so position is taken from the unfiltered list.
+ * @param {Object} state
+ * @returns {Object|null} The next item, or null if there is none.
+ */
+export function findNextPost(state) {
+    const posts = getPostsForSelection(state);
+    const index = posts.findIndex((p) => p.item.id === state.selectedPostId);
+    if (index === -1) return null;
+    const next = posts
+        .slice(index + 1)
+        .find((p) => matchesFilter(p.item, state.filter));
+    return next?.item ?? null;
 }
 
 // ── Render ──
@@ -119,15 +136,12 @@ export function renderPosts(state, callbacks) {
         : (selectedFeed?.title ?? "");
 
     const posts = getPostsForSelection(state);
-    const filtered = posts.filter((p) => {
-        if (state.filter === "unread") return !p.item.read;
-        if (state.filter === "read") return p.item.read;
-        return true;
-    });
+    const filtered = posts.filter((p) => matchesFilter(p.item, state.filter));
 
     for (const p of filtered) {
         const { item } = p;
         const li = document.createElement("li");
+        li.dataset.id = item.id;
         if (!item.read) li.classList.add("unread");
         if (state.selectedPostId === item.id) li.classList.add("selected");
 
@@ -216,6 +230,10 @@ export function renderDetail(state, callbacks) {
     } else {
         linkEl.hidden = true;
     }
+
+    const next = findNextPost(state);
+    document.getElementById("detail-next").hidden = !next;
+    document.getElementById("detail-next-title").textContent = next?.title ?? "";
 }
 
 // ── Private helpers ──
@@ -231,6 +249,12 @@ function getPostsForSelection(state) {
     const feed = state.feeds.find((f) => f.id === state.selectedFeedId);
     if (!feed) return [];
     return feed.items.map((item) => ({ item, feedTitle: feed.title, feedUrl: feed.url }));
+}
+
+function matchesFilter(item, filter) {
+    if (filter === "unread") return !item.read;
+    if (filter === "read") return item.read;
+    return true;
 }
 
 function formatDate(dateStr) {
