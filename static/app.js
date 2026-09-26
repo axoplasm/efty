@@ -5,6 +5,7 @@ import {
     renderPanes,
     renderPosts,
     findPost,
+    findAdjacentPost,
     findNextPost,
 } from "/static/render.js";
 
@@ -36,16 +37,30 @@ function expandPane(paneId) {
     renderPanes(state);
 }
 
-function selectFeed(feedId) {
+/**
+ * Show a feed's posts in the posts pane.
+ * @param {number|string} feedId - A feed DB id, or "all".
+ * @param {Object} [options]
+ * @param {boolean} [options.expand=true] - Expand the posts pane in the narrow
+ *     layout. Keyboard navigation within the feeds pane passes false.
+ */
+function selectFeed(feedId, { expand = true } = {}) {
     state.selectedFeedId = feedId;
     state.selectedPostId = null;
-    state.expandedPane = "posts-pane";
+    if (expand) state.expandedPane = "posts-pane";
     rerender();
 }
 
-function selectPost(id) {
+/**
+ * Show a post in the detail pane and mark it read.
+ * @param {number} id - The item's DB id.
+ * @param {Object} [options]
+ * @param {boolean} [options.expand=true] - Expand the detail pane in the
+ *     narrow layout. Keyboard navigation within the posts pane passes false.
+ */
+function selectPost(id, { expand = true } = {}) {
     state.selectedPostId = id;
-    state.expandedPane = "detail-pane";
+    if (expand) state.expandedPane = "detail-pane";
     const match = findPost(state.feeds, id);
     if (match && !match.item.read) {
         match.item.read = true;
@@ -190,10 +205,107 @@ function openNextPost() {
     const next = findNextPost(state);
     if (!next) return;
     selectPost(next.id);
-    // With the "unread" filter the newly read post drops out of the list, so
-    // there may be nothing to scroll to.
-    document.querySelector(`#posts-list li[data-id="${next.id}"]`)
+    scrollSelectedIntoView("posts-list");
+}
+
+/**
+ * Scroll a list's selected entry into view. With the "unread" filter, a post
+ * that was just opened is marked read and drops out of the list, so there may
+ * be nothing to scroll to.
+ * @param {string} listId - "feeds-list" or "posts-list".
+ */
+function scrollSelectedIntoView(listId) {
+    document.querySelector(`#${listId} li.selected`)
         ?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+}
+
+// ── Keyboard navigation ──
+//
+// Left/right move focus between the panes. Up/down change the selected feed
+// in the feeds pane and the selected post in the posts pane; in the detail
+// pane they scroll the article as usual.
+
+const PANE_ORDER = ["feeds-pane", "posts-pane", "detail-pane"];
+
+/** Return the id of the pane containing keyboard focus, or null. */
+function focusedPaneId() {
+    return document.activeElement?.closest(PANE_ORDER.map((id) => `#${id}`).join(","))
+        ?.id ?? null;
+}
+
+/**
+ * Move focus to a pane, expanding it first in the narrow layout.
+ * @param {string} paneId
+ */
+function focusPane(paneId) {
+    expandPane(paneId);
+    document.getElementById(paneId).focus();
+}
+
+/**
+ * Select the feed above or below the selected one ("All Feeds" is first).
+ * @param {number} step - 1 for down, -1 for up.
+ */
+function moveFeedSelection(step) {
+    const ids = ["all", ...state.feeds.map((f) => f.id)];
+    const index = ids.indexOf(state.selectedFeedId);
+    const next = index === -1 ? 0 : index + step;
+    if (next < 0 || next >= ids.length || next === index) return;
+    selectFeed(ids[next], { expand: false });
+    scrollSelectedIntoView("feeds-list");
+}
+
+/**
+ * Open the post above or below the selected one.
+ * @param {number} step - 1 for down, -1 for up.
+ */
+function movePostSelection(step) {
+    const post = findAdjacentPost(state, step);
+    if (!post) return;
+    selectPost(post.id, { expand: false });
+    scrollSelectedIntoView("posts-list");
+}
+
+/**
+ * Handle arrow keys for pane and list navigation.
+ * @param {KeyboardEvent} e
+ */
+function onKeydown(e) {
+    if (e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+    if (document.getElementById("modal").open) return;
+    if (e.target.closest("input, select, textarea, [contenteditable]")) return;
+
+    let paneId = focusedPaneId();
+    if (!paneId) {
+        // Nothing focused yet: start in the feeds pane.
+        paneId = "feeds-pane";
+        document.getElementById(paneId).focus();
+    }
+    const paneIndex = PANE_ORDER.indexOf(paneId);
+
+    switch (e.key) {
+        case "ArrowLeft":
+        case "ArrowRight": {
+            const step = e.key === "ArrowRight" ? 1 : -1;
+            const target = PANE_ORDER[paneIndex + step];
+            e.preventDefault();
+            focusPane(target ?? paneId);
+            break;
+        }
+        case "ArrowUp":
+        case "ArrowDown": {
+            const step = e.key === "ArrowDown" ? 1 : -1;
+            if (paneId === "feeds-pane") {
+                e.preventDefault();
+                moveFeedSelection(step);
+            } else if (paneId === "posts-pane") {
+                e.preventDefault();
+                movePostSelection(step);
+            }
+            // In the detail pane, let the browser scroll the article.
+            break;
+        }
+    }
 }
 
 /**
@@ -286,6 +398,7 @@ async function init() {
             expandPane(toggle.getAttribute("aria-controls"));
         });
     }
+    document.addEventListener("keydown", onKeydown);
     window.matchMedia(NARROW_QUERY).addEventListener("change", () => {
         renderPanes(state);
     });

@@ -15,20 +15,34 @@ export function findPost(feeds, id) {
 }
 
 /**
+ * Find the post listed before or after the selected one, respecting the
+ * current filter. The selected post itself may have been filtered out (e.g.
+ * marked read while the "unread" filter is on), so position is taken from the
+ * unfiltered list. With no post selected, returns the first listed post.
+ * @param {Object} state
+ * @param {number} step - 1 for the next post, -1 for the previous one.
+ * @returns {Object|null} The item, or null if there is none.
+ */
+export function findAdjacentPost(state, step) {
+    const posts = getPostsForSelection(state);
+    const index = posts.findIndex((p) => p.item.id === state.selectedPostId);
+    if (index === -1) {
+        return posts.find((p) => matchesFilter(p.item, state.filter))?.item ?? null;
+    }
+    for (let i = index + step; i >= 0 && i < posts.length; i += step) {
+        if (matchesFilter(posts[i].item, state.filter)) return posts[i].item;
+    }
+    return null;
+}
+
+/**
  * Find the post listed after the selected one, respecting the current filter.
- * The selected post itself may have been filtered out (e.g. marked read while
- * the "unread" filter is on), so position is taken from the unfiltered list.
  * @param {Object} state
  * @returns {Object|null} The next item, or null if there is none.
  */
 export function findNextPost(state) {
-    const posts = getPostsForSelection(state);
-    const index = posts.findIndex((p) => p.item.id === state.selectedPostId);
-    if (index === -1) return null;
-    const next = posts
-        .slice(index + 1)
-        .find((p) => matchesFilter(p.item, state.filter));
-    return next?.item ?? null;
+    if (state.selectedPostId === null) return null;
+    return findAdjacentPost(state, 1);
 }
 
 // ── Render ──
