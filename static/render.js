@@ -131,6 +131,16 @@ export function renderPosts(state, callbacks) {
         if (!item.read) li.classList.add("unread");
         if (state.selectedPostId === item.id) li.classList.add("selected");
 
+        if (state.selectedFeedId === "all" && item.link) {
+            const thumb = document.createElement("img");
+            thumb.className = "post-thumb";
+            thumb.src = `/api/items/${item.id}/thumbnail`;
+            thumb.alt = "";
+            thumb.loading = "lazy";
+            thumb.addEventListener("error", () => thumb.remove());
+            li.appendChild(thumb);
+        }
+
         const titleDiv = document.createElement("div");
         titleDiv.className = "post-title";
 

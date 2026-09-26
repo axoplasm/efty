@@ -4,7 +4,9 @@ import functools
 import os
 import re
 import sqlite3
+import urllib.parse
 import urllib.request
+from html.parser import HTMLParser
 
 import feedparser
 from flask import (
@@ -54,7 +56,15 @@ def init_db():
         schema = os.path.join(BASE_DIR, "schema.sql")
         with open(schema) as f:
             db.executescript(f.read())
+        _migrate(db)
         db.commit()
+
+
+def _migrate(db):
+    """Apply additive schema changes to databases created by older versions."""
+    columns = {row["name"] for row in db.execute("PRAGMA table_info(items)")}
+    if "thumbnail" not in columns:
+        db.execute("ALTER TABLE items ADD COLUMN thumbnail TEXT")
 
 
 # ── Feed fetching ──
@@ -110,6 +120,67 @@ def fetch_and_parse(url):
         })
 
     return title, items
+
+
+# Only the <head> is needed to find og:image; don't download whole pages.
+_THUMBNAIL_READ_LIMIT = 256 * 1024
+
+
+class _OGImageParser(HTMLParser):
+    """Collect the first og:image URL from an HTML document."""
+
+    _PROPERTIES = {"og:image", "og:image:url", "og:image:secure_url"}
+
+    def __init__(self):
+        """Initialize with no image found."""
+        super().__init__()
+        self.image = None
+
+    def handle_starttag(self, tag, attrs):
+        """Record the content of the first matching <meta> tag."""
+        if tag != "meta" or self.image:
+            return
+        attrs = dict(attrs)
+        prop = (attrs.get("property") or attrs.get("name") or "").lower()
+        if prop in self._PROPERTIES and attrs.get("content"):
+            self.image = attrs["content"].strip()
+
+
+def fetch_og_image(url):
+    """Fetch a web page and return its og:image URL.
+
+    Args:
+        url: The page URL to fetch. Only http(s) URLs are fetched.
+
+    Returns:
+        The absolute http(s) image URL, or an empty string if the page has none
+        or cannot be fetched.
+    """
+    if urllib.parse.urlsplit(url).scheme not in ("http", "https"):
+        return ""
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": _USER_AGENT})
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            if "html" not in resp.headers.get("Content-Type", ""):
+                return ""
+            charset = resp.headers.get_content_charset() or "utf-8"
+            html = resp.read(_THUMBNAIL_READ_LIMIT).decode(charset, "replace")
+            base = resp.geturl()
+    except Exception:
+        return ""
+
+    parser = _OGImageParser()
+    try:
+        parser.feed(html)
+    except Exception:
+        pass
+    if not parser.image:
+        return ""
+
+    image = urllib.parse.urljoin(base, parser.image)
+    if urllib.parse.urlsplit(image).scheme not in ("http", "https"):
+        return ""
+    return image
 
 
 def feed_to_dict(feed_row, item_rows):
@@ -341,6 +412,35 @@ def update_item(item_id):
     )
     db.commit()
     return "", 204
+
+
+@app.route("/api/items/<int:item_id>/thumbnail")
+@require_login
+def item_thumbnail(item_id):
+    """Redirect to the item's og:image, looking it up and caching it on first use."""
+    db = get_db()
+    item = db.execute(
+        """SELECT items.id, items.link, items.thumbnail FROM items
+           JOIN feeds ON feeds.id = items.feed_id
+           WHERE items.id = ? AND feeds.user_id = ?""",
+        (item_id, session["user_id"]),
+    ).fetchone()
+    if not item:
+        return jsonify({"error": "Item not found"}), 404
+
+    thumbnail = item["thumbnail"]
+    if thumbnail is None:
+        thumbnail = fetch_og_image(item["link"])
+        db.execute(
+            "UPDATE items SET thumbnail = ? WHERE id = ?", (thumbnail, item_id)
+        )
+        db.commit()
+
+    if not thumbnail:
+        return jsonify({"error": "No thumbnail"}), 404
+    response = redirect(thumbnail)
+    response.headers["Cache-Control"] = "private, max-age=86400"
+    return response
 
 
 # ── Internal helpers ──

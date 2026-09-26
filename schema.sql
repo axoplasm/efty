@@ -24,6 +24,8 @@ CREATE TABLE IF NOT EXISTS items (
     summary TEXT    NOT NULL DEFAULT '',
     content TEXT    NOT NULL DEFAULT '',
     read    INTEGER NOT NULL DEFAULT 0,
+    -- og:image URL of the linked page. NULL = not yet looked up, '' = none found.
+    thumbnail TEXT,
     UNIQUE(feed_id, guid)
 );
 

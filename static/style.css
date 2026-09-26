@@ -47,6 +47,7 @@
 
     --pane-feeds: 14rem;
     --pane-posts: 20rem;
+    --thumb-size: 3.5rem;
     --detail-max: 45rem;
     --modal-width: 26rem;
 }
@@ -263,6 +264,7 @@ main {
     flex: 1;
 
     li {
+        display: flow-root;
         padding: calc(var(--space) * 1.25) calc(var(--space) * 1.5);
         cursor: pointer;
         border-block-end: 1px solid var(--border);
@@ -297,6 +299,16 @@ main {
     border-radius: 50%;
     flex-shrink: 0;
     margin-top: 5px;
+}
+
+.post-thumb {
+    float: inline-end;
+    width: var(--thumb-size);
+    height: var(--thumb-size);
+    object-fit: cover;
+    margin-inline-start: var(--space);
+    border-radius: 4px;
+    background: var(--bg);
 }
 
 .post-date {
