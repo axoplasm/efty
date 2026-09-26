@@ -50,6 +50,7 @@
     --thumb-size: 3.5rem;
     --detail-max: 45rem;
     --modal-width: 26rem;
+    --icon-size: 1.25rem;
 }
 
 body {
@@ -89,25 +90,33 @@ header {
     gap: var(--space);
 }
 
+.icon {
+    display: block;
+    width: var(--icon-size);
+    height: var(--icon-size);
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
 #subscribe-btn {
-    padding: calc(var(--space) * 0.75) calc(var(--space) * 1.75);
+    padding: calc(var(--space) * 0.75);
     background: var(--accent);
     color: #fff;
-    border: none;
+    border: 1px solid var(--accent);
     border-radius: 6px;
-    font-size: var(--font-sm);
-    font-weight: 600;
     cursor: pointer;
 
     &:hover {
         background: var(--accent-hover);
+        border-color: var(--accent-hover);
     }
 }
 
 #logout-btn {
-    padding: calc(var(--space) * 0.75) calc(var(--space) * 1.75);
-    font-size: var(--font-sm);
-    font-weight: 600;
+    padding: calc(var(--space) * 0.75);
     border: 1px solid var(--border);
     border-radius: 6px;
     background: var(--surface);
@@ -387,6 +396,7 @@ main {
     justify-content: space-between;
     gap: calc(var(--space) * 1.5);
     margin-bottom: var(--space);
+    padding-inline: 0;
 }
 
 #detail-title {
