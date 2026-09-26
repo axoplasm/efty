@@ -92,7 +92,9 @@ def test_migrate_adds_thumbnail_column(tmp_path):
     """Databases created before the thumbnail column get it added."""
     db = sqlite3.connect(tmp_path / "old.db")
     db.row_factory = sqlite3.Row
-    db.execute("CREATE TABLE items (id INTEGER PRIMARY KEY, title TEXT)")
+    db.execute(
+        "CREATE TABLE items (id INTEGER PRIMARY KEY, title TEXT, date TEXT)"
+    )
     server._migrate(db)
     columns = {row["name"] for row in db.execute("PRAGMA table_info(items)")}
     assert "thumbnail" in columns

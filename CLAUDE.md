@@ -46,6 +46,8 @@ SQLite via Python's `sqlite3`. Schema in `schema.sql`, initialized automatically
 
 Feeds and items are per-user. `INSERT OR IGNORE` on guid prevents duplicate items when a feed is refreshed.
 
+`items.date` is a UTC ISO 8601 string (e.g. `2026-03-18T12:00:00+00:00`), or empty if the feed gave no parseable date, so `ORDER BY date DESC` is chronological. `_migrate()` in `server.py` applies schema and data changes to older databases, tracked with `PRAGMA user_version`.
+
 ## API Endpoints
 
 | Method | Path | Purpose |

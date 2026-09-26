@@ -78,21 +78,7 @@ def auth(app, client):
 
 @pytest.fixture()
 def mock_fetch(monkeypatch):
-    """Monkeypatch fetch_and_parse to return a canned feed without HTTP."""
-    def _fake_fetch(url):
-        import feedparser
-        parsed = feedparser.parse(RSS_FEED)
-        title = parsed.feed.get("title") or url
-        items = []
-        for entry in parsed.entries:
-            items.append({
-                "guid": entry.get("id") or entry.get("link") or "",
-                "title": entry.get("title") or "Untitled",
-                "link": entry.get("link", ""),
-                "date": entry.get("published") or "",
-                "summary": entry.get("summary", "")[:200],
-                "content": entry.get("summary", ""),
-            })
-        return title, items
-
-    monkeypatch.setattr(server, "fetch_and_parse", _fake_fetch)
+    """Monkeypatch fetch_and_parse to parse a canned feed without HTTP."""
+    monkeypatch.setattr(
+        server, "fetch_and_parse", lambda url: server.parse_feed(RSS_FEED, url)
+    )

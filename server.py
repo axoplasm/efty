@@ -1,5 +1,7 @@
 """Efty server — Flask backend with SQLite persistence and user auth."""
 
+import datetime
+import email.utils
 import functools
 import os
 import re
@@ -61,15 +63,55 @@ def init_db():
 
 
 def _migrate(db):
-    """Apply additive schema changes to databases created by older versions."""
+    """Apply schema and data changes to databases created by older versions."""
     columns = {row["name"] for row in db.execute("PRAGMA table_info(items)")}
     if "thumbnail" not in columns:
         db.execute("ALTER TABLE items ADD COLUMN thumbnail TEXT")
+
+    version = db.execute("PRAGMA user_version").fetchone()[0]
+    if version < 1:
+        # Item dates used to be stored as the feed's raw date string, which
+        # doesn't sort chronologically. Normalize them to UTC ISO 8601.
+        rows = db.execute("SELECT id, date FROM items").fetchall()
+        for row in rows:
+            iso = _iso_date(row["date"])
+            if iso and iso != row["date"]:
+                db.execute("UPDATE items SET date = ? WHERE id = ?", (iso, row["id"]))
+        db.execute("PRAGMA user_version = 1")
 
 
 # ── Feed fetching ──
 
 _USER_AGENT = "Efty RSS Reader/1.0"
+
+
+def _iso_date(value):
+    """Convert a feed date to a UTC ISO 8601 string, so dates sort as text.
+
+    Args:
+        value: A ``time.struct_time`` in UTC (as feedparser's ``*_parsed``
+            fields provide), or a date string in RFC 822 (RSS) or ISO 8601
+            (Atom) format.
+
+    Returns:
+        A string like ``2026-03-18T12:00:00+00:00``, or an empty string if the
+        value is missing or can't be parsed.
+    """
+    if not value:
+        return ""
+    if isinstance(value, str):
+        try:
+            parsed = email.utils.parsedate_to_datetime(value)
+        except (TypeError, ValueError):
+            try:
+                parsed = datetime.datetime.fromisoformat(value)
+            except ValueError:
+                return ""
+    else:
+        parsed = datetime.datetime(*value[:6], tzinfo=datetime.UTC)
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=datetime.UTC)
+    return parsed.astimezone(datetime.UTC).isoformat()
 
 
 def fetch_and_parse(url):
@@ -91,6 +133,23 @@ def fetch_and_parse(url):
     except Exception as exc:
         raise ValueError(f"Could not fetch feed: {exc}") from exc
 
+    return parse_feed(data, url)
+
+
+def parse_feed(data, url):
+    """Parse an RSS or Atom document. Return (title, items).
+
+    Args:
+        data: The feed document, as bytes or str.
+        url: The feed URL, used as the title if the feed has none.
+
+    Returns:
+        A tuple of (feed_title: str, items: list[dict]). Item dates are UTC
+        ISO 8601 strings, or empty if the entry has no parseable date.
+
+    Raises:
+        ValueError: If the feed cannot be parsed.
+    """
     parsed = feedparser.parse(data)
     if parsed.bozo and not parsed.entries:
         raise ValueError(f"Could not parse feed: {parsed.get('bozo_exception')}")
@@ -106,7 +165,12 @@ def fetch_and_parse(url):
 
         raw_summary = entry.get("summary", "") or content
         summary = re.sub(r"<[^>]+>", "", raw_summary)[:200]
-        date = entry.get("published") or entry.get("updated") or ""
+        date = _iso_date(
+            entry.get("published_parsed")
+            or entry.get("updated_parsed")
+            or entry.get("published")
+            or entry.get("updated")
+        )
 
         items.append({
             "guid": (
