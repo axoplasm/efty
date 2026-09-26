@@ -56,7 +56,7 @@ Feeds and items are per-user. `INSERT OR IGNORE` on guid prevents duplicate item
 | `POST` | `/auth/login` | Start session |
 | `POST` | `/auth/logout` | Clear session |
 | `GET` | `/api/feeds` | All feeds + items for current user |
-| `POST` | `/api/feeds` | Subscribe to a feed URL (fetches + parses) |
+| `POST` | `/api/feeds` | Subscribe to a feed URL, or a page that links to one via `<link rel="alternate">` (fetches + parses) |
 | `DELETE` | `/api/feeds/<id>` | Unsubscribe |
 | `POST` | `/api/feeds/<id>/refresh` | Re-fetch items from source |
 | `PATCH` | `/api/items/<id>` | Update `read` status `{ "read": bool }` |

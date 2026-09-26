@@ -114,6 +114,20 @@ def _iso_date(value):
     return parsed.astimezone(datetime.UTC).isoformat()
 
 
+def _fetch(url):
+    """Fetch a URL. Return (body, final_url) after following redirects.
+
+    Raises:
+        ValueError: If the URL cannot be fetched.
+    """
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": _USER_AGENT})
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            return resp.read(), resp.geturl()
+    except Exception as exc:
+        raise ValueError(f"Could not fetch {url}: {exc}") from exc
+
+
 def fetch_and_parse(url):
     """Fetch and parse an RSS or Atom feed. Return (title, items).
 
@@ -126,14 +140,93 @@ def fetch_and_parse(url):
     Raises:
         ValueError: If the feed cannot be fetched or parsed.
     """
-    try:
-        req = urllib.request.Request(url, headers={"User-Agent": _USER_AGENT})
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            data = resp.read()
-    except Exception as exc:
-        raise ValueError(f"Could not fetch feed: {exc}") from exc
-
+    data, _ = _fetch(url)
     return parse_feed(data, url)
+
+
+class NotAFeedError(ValueError):
+    """The document parsed, but isn't an RSS or Atom feed (e.g. an HTML page)."""
+
+
+_FEED_TYPES = {"application/rss+xml", "application/atom+xml"}
+
+
+class _FeedLinkParser(HTMLParser):
+    """Collect feed URLs advertised with <link rel="alternate"> tags."""
+
+    def __init__(self):
+        """Initialize with no links found."""
+        super().__init__()
+        self.hrefs = []
+
+    def handle_starttag(self, tag, attrs):
+        """Record the href of each feed <link> tag."""
+        if tag != "link":
+            return
+        attrs = dict(attrs)
+        rels = (attrs.get("rel") or "").lower().split()
+        mime = (attrs.get("type") or "").lower().split(";")[0].strip()
+        if "alternate" in rels and mime in _FEED_TYPES and attrs.get("href"):
+            self.hrefs.append(attrs["href"].strip())
+
+
+def discover_feed_links(html, base_url):
+    """Find the feeds an HTML page links to in its <link> tags.
+
+    Args:
+        html: The page, as bytes or str.
+        base_url: The page URL, for resolving relative links.
+
+    Returns:
+        A list of absolute http(s) feed URLs, in document order, without
+        duplicates.
+    """
+    if isinstance(html, bytes):
+        html = html.decode("utf-8", "replace")
+    parser = _FeedLinkParser()
+    try:
+        parser.feed(html)
+    except Exception:
+        pass
+
+    links = []
+    for href in parser.hrefs:
+        link = urllib.parse.urljoin(base_url, href)
+        scheme = urllib.parse.urlsplit(link).scheme
+        if scheme in ("http", "https") and link not in links:
+            links.append(link)
+    return links
+
+
+def find_feed(url):
+    """Fetch a feed, or the first working feed linked from a web page.
+
+    Args:
+        url: A feed URL, or the URL of a page that links to its feed.
+
+    Returns:
+        A tuple of (feed_url: str, feed_title: str, items: list[dict]).
+        ``feed_url`` is the discovered feed's URL when ``url`` was a page.
+
+    Raises:
+        ValueError: If no feed can be found, fetched, or parsed.
+    """
+    data, final_url = _fetch(url)
+    try:
+        return (url, *parse_feed(data, url))
+    except NotAFeedError:
+        pass
+
+    links = discover_feed_links(data, final_url)
+    if not links:
+        raise ValueError("No feed found at that address")
+    errors = []
+    for link in links:
+        try:
+            return (link, *fetch_and_parse(link))
+        except ValueError as exc:
+            errors.append(str(exc))
+    raise ValueError(f"The page links to a feed, but it failed to load: {errors[0]}")
 
 
 def parse_feed(data, url):
@@ -151,6 +244,8 @@ def parse_feed(data, url):
         ValueError: If the feed cannot be parsed.
     """
     parsed = feedparser.parse(data)
+    if not parsed.version and not parsed.entries:
+        raise NotAFeedError("Not an RSS or Atom feed")
     if parsed.bozo and not parsed.entries:
         raise ValueError(f"Could not parse feed: {parsed.get('bozo_exception')}")
 
@@ -361,14 +456,18 @@ def get_feeds():
 @app.route("/api/feeds", methods=["POST"])
 @require_login
 def add_feed():
-    """Subscribe to a new feed by URL. Fetches and stores its items."""
+    """Subscribe to a feed by URL. Fetches and stores its items.
+
+    The URL may be a web page instead of a feed, in which case the page's
+    first working <link rel="alternate"> feed is subscribed to.
+    """
     data = request.get_json(silent=True) or {}
     url = data.get("url", "").strip()
     if not url:
         return jsonify({"error": "URL is required"}), 422
 
     try:
-        title, items = fetch_and_parse(url)
+        url, title, items = find_feed(url)
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 502
 

@@ -78,7 +78,5 @@ def auth(app, client):
 
 @pytest.fixture()
 def mock_fetch(monkeypatch):
-    """Monkeypatch fetch_and_parse to parse a canned feed without HTTP."""
-    monkeypatch.setattr(
-        server, "fetch_and_parse", lambda url: server.parse_feed(RSS_FEED, url)
-    )
+    """Serve the canned RSS feed for every URL, without HTTP."""
+    monkeypatch.setattr(server, "_fetch", lambda url: (RSS_FEED.encode(), url))
