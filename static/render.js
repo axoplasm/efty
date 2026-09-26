@@ -33,15 +33,40 @@ export function findNextPost(state) {
 
 // ── Render ──
 
+// Below this width the panes stack vertically and only one is expanded at a
+// time. Keep in sync with the matching @media rule in style.css.
+export const NARROW_QUERY = "(width < 48rem)";
+
 /**
  * Re-render all three panes.
  * @param {Object} state
- * @param {Object} callbacks - { selectFeed, selectPost, removeFeed, refreshFeed }
+ * @param {Object} callbacks - { selectFeed, selectPost }
  */
 export function render(state, callbacks) {
+    renderPanes(state);
     renderFeeds(state, callbacks);
     renderPosts(state, callbacks);
     renderDetail(state, callbacks);
+}
+
+/**
+ * Mark the expanded pane. The pane titles only act as expand/collapse toggles
+ * in the narrow, stacked layout; in the wide layout they are disabled.
+ * @param {Object} state
+ */
+export function renderPanes(state) {
+    const narrow = window.matchMedia(NARROW_QUERY).matches;
+    for (const toggle of document.querySelectorAll(".pane-toggle")) {
+        const paneId = toggle.getAttribute("aria-controls");
+        const expanded = paneId === state.expandedPane;
+        document.getElementById(paneId).classList.toggle("expanded", expanded);
+        toggle.disabled = !narrow;
+        if (narrow) {
+            toggle.setAttribute("aria-expanded", expanded);
+        } else {
+            toggle.removeAttribute("aria-expanded");
+        }
+    }
 }
 
 /**
@@ -90,26 +115,6 @@ export function renderFeeds(state, callbacks) {
             li.appendChild(badge);
         }
 
-        const refreshBtn = document.createElement("button");
-        refreshBtn.className = "feed-refresh";
-        refreshBtn.textContent = "\u21ba";
-        refreshBtn.title = "Refresh";
-        refreshBtn.addEventListener("click", (e) => {
-            e.stopPropagation();
-            callbacks.refreshFeed(feed.id);
-        });
-        li.appendChild(refreshBtn);
-
-        const removeBtn = document.createElement("button");
-        removeBtn.className = "feed-remove";
-        removeBtn.textContent = "\u00d7";
-        removeBtn.title = "Unsubscribe";
-        removeBtn.addEventListener("click", (e) => {
-            e.stopPropagation();
-            callbacks.removeFeed(feed.id);
-        });
-        li.appendChild(removeBtn);
-
         li.addEventListener("click", () => callbacks.selectFeed(feed.id));
         list.appendChild(li);
     }
@@ -127,10 +132,13 @@ export function renderPosts(state, callbacks) {
 
     if (state.selectedFeedId === null) {
         titleEl.textContent = "Posts";
+        document.getElementById("feed-actions").hidden = true;
         return;
     }
 
     const selectedFeed = state.feeds.find((f) => f.id === state.selectedFeedId);
+    // Refresh/unsubscribe only apply to a single feed, not "All Feeds".
+    document.getElementById("feed-actions").hidden = !selectedFeed;
     titleEl.textContent = state.selectedFeedId === "all"
         ? "All Feeds"
         : (selectedFeed?.title ?? "");

@@ -26,8 +26,8 @@ Then open `http://localhost:8000`. Set `SECRET_KEY` in the environment for sessi
 ## Architecture
 
 **Three-pane layout:**
-- Left — subscribed feed list (with refresh ↺ and unsubscribe × buttons on hover)
-- Center — post previews for the selected feed (filterable by read/unread)
+- Left — subscribed feed list
+- Center — post previews for the selected feed (filterable by read/unread); when a single feed is open, its toolbar has refresh ↺ and unsubscribe × buttons
 - Right — full post detail with read/unread toggle
 
 **Auth**: Session-based, cookie-backed. Flask's signed session cookie stores `user_id`. All `/api/*` routes require a valid session and return `401` otherwise; the frontend redirects to `/login` on 401.
@@ -76,9 +76,9 @@ Feed responses shape: `{ id, url, title, items: [{ id, guid, title, link, date, 
 
 **State model** (`app.js`): A single `state` object holds `feeds[]`, `selectedFeedId` (integer feed DB id, `"all"`, or `null`), `selectedPostId` (integer item DB id or `null`), and `filter`. All feed/item mutations are async API calls; UI state updates are optimistic (update state immediately, fire API call in background).
 
-**Render/action decoupling**: Render functions accept a `callbacks` object `{ selectFeed, selectPost, removeFeed, refreshFeed }` instead of importing from `app.js`, avoiding a circular dependency. `findPost(feeds, id)` is exported from `render.js` and used by both `render.js` and `app.js`.
+**Render/action decoupling**: Render functions accept a `callbacks` object `{ selectFeed, selectPost }` instead of importing from `app.js`, avoiding a circular dependency. `findPost(feeds, id)` is exported from `render.js` and used by both `render.js` and `app.js`.
 
-**Feed refresh strategy**: On-demand only — no background refresh. Items are fetched when a feed is first added (`POST /api/feeds`) or explicitly refreshed (`POST /api/feeds/<id>/refresh`). The refresh button (↺) appears on hover in the feeds list.
+**Feed refresh strategy**: On-demand only — no background refresh. Items are fetched when a feed is first added (`POST /api/feeds`) or explicitly refreshed (`POST /api/feeds/<id>/refresh`). The refresh button (↺) is in the posts pane toolbar when a single feed is open.
 
 **HTML sanitization** (`sanitizeHTML` in `render.js`): Strips `<script>` tags and `on*` attributes, blocks `javascript:` hrefs, resolves relative URLs against the feed's base URL before setting `innerHTML`.
 

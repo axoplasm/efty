@@ -17,12 +17,18 @@
     </header>
     <main>
       <aside id="feeds-pane">
-        <h2>Feeds</h2>
+        <header class="pane-header">
+          <h2><button type="button" class="pane-toggle" aria-controls="feeds-pane">Feeds</button></h2>
+        </header>
         <ul id="feeds-list"></ul>
       </aside>
       <section id="posts-pane">
-        <header id="posts-toolbar">
-          <h2 id="posts-title">Posts</h2>
+        <header id="posts-toolbar" class="pane-header">
+          <h2><button type="button" class="pane-toggle" id="posts-title" aria-controls="posts-pane">Posts</button></h2>
+          <menu id="feed-actions" hidden>
+            <li><button type="button" id="feed-refresh" title="Refresh" aria-label="Refresh feed">↺</button></li>
+            <li><button type="button" id="feed-remove" title="Unsubscribe" aria-label="Unsubscribe">×</button></li>
+          </menu>
           <select id="posts-filter">
             <option value="all">All</option>
             <option value="unread">Unread</option>
@@ -32,6 +38,9 @@
         <ul id="posts-list"></ul>
       </section>
       <section id="detail-pane">
+        <header class="pane-header">
+          <h2><button type="button" class="pane-toggle" aria-controls="detail-pane">Article</button></h2>
+        </header>
         <p id="detail-empty">Select a post to read</p>
         <article id="detail-content" hidden>
           <header id="detail-header">

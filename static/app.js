@@ -1,20 +1,29 @@
 import * as api from "/static/api.js";
-import { render, renderPosts, findPost, findNextPost } from "/static/render.js";
+import {
+    NARROW_QUERY,
+    render,
+    renderPanes,
+    renderPosts,
+    findPost,
+    findNextPost,
+} from "/static/render.js";
 
 // ── State ──
 
 // feeds: [{ id, url, title, items: [{ id, guid, title, link, date, summary, content, read }] }]
 // selectedFeedId: integer feed DB id, "all", or null
+// expandedPane: id of the pane shown in the narrow, stacked layout
 const state = {
     feeds: [],
     selectedFeedId: null,
     selectedPostId: null,
     filter: "all",
+    expandedPane: "feeds-pane",
 };
 
 // Callbacks passed into render functions so they can trigger actions without
 // importing app.js (which would create a circular dependency).
-const callbacks = { selectFeed, selectPost, removeFeed, refreshFeed };
+const callbacks = { selectFeed, selectPost };
 
 function rerender() {
     render(state, callbacks);
@@ -22,14 +31,21 @@ function rerender() {
 
 // ── Actions ──
 
+function expandPane(paneId) {
+    state.expandedPane = paneId;
+    renderPanes(state);
+}
+
 function selectFeed(feedId) {
     state.selectedFeedId = feedId;
     state.selectedPostId = null;
+    state.expandedPane = "posts-pane";
     rerender();
 }
 
 function selectPost(id) {
     state.selectedPostId = id;
+    state.expandedPane = "detail-pane";
     const match = findPost(state.feeds, id);
     if (match && !match.item.read) {
         match.item.read = true;
@@ -58,6 +74,7 @@ function removeFeed(feedId) {
         if (state.selectedFeedId === feedId) {
             state.selectedFeedId = null;
             state.selectedPostId = null;
+            state.expandedPane = "feeds-pane";
         }
         rerender();
     }
@@ -102,6 +119,7 @@ async function subscribeFeed(url) {
     state.feeds.push(feed);
     state.selectedFeedId = feed.id;
     state.selectedPostId = null;
+    state.expandedPane = "posts-pane";
     rerender();
     closeModal();
 }
@@ -246,6 +264,31 @@ async function init() {
 
     document.getElementById("detail-toggle-read").addEventListener("click", toggleReadStatus);
     bindOverscroll();
+
+    document.getElementById("feed-refresh").addEventListener("click", async (e) => {
+        const button = e.currentTarget;
+        button.disabled = true;
+        try {
+            await refreshFeed(state.selectedFeedId);
+        } finally {
+            button.disabled = false;
+        }
+    });
+    document.getElementById("feed-remove").addEventListener("click", () => {
+        const feed = state.feeds.find((f) => f.id === state.selectedFeedId);
+        if (feed && window.confirm(`Unsubscribe from “${feed.title}”?`)) {
+            removeFeed(feed.id);
+        }
+    });
+
+    for (const toggle of document.querySelectorAll(".pane-toggle")) {
+        toggle.addEventListener("click", () => {
+            expandPane(toggle.getAttribute("aria-controls"));
+        });
+    }
+    window.matchMedia(NARROW_QUERY).addEventListener("change", () => {
+        renderPanes(state);
+    });
     document.getElementById("detail-next-title").addEventListener("click", openNextPost);
 }
 
