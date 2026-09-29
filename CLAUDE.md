@@ -36,7 +36,7 @@ Then open `http://localhost:8000`. Set `SECRET_KEY` in the environment for sessi
 
 ## Database
 
-SQLite via Python's `sqlite3`. Schema in `schema.sql`, initialized automatically on startup by `init_db()` in `server.py`. Three tables:
+SQLite via Python's `sqlite3`. Schema in `schema.sql`, initialized (with migrations) by `init_db()` in `server.py` — automatically under `python server.py`, or via `flask --app server init-db` (used by the systemd unit's `ExecStartPre`, since Gunicorn doesn't run it). Three tables:
 
 | Table | Key columns |
 |---|---|

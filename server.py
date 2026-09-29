@@ -62,6 +62,13 @@ def init_db():
         db.commit()
 
 
+@app.cli.command("init-db")
+def init_db_command():
+    """Create the database tables and apply any pending migrations."""
+    init_db()
+    print(f"Database ready: {DB_PATH}")
+
+
 def _migrate(db):
     """Apply schema and data changes to databases created by older versions."""
     columns = {row["name"] for row in db.execute("PRAGMA table_info(items)")}

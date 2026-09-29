@@ -55,7 +55,9 @@ Architecture
 ### Backend (`server.py`)
 
 Flask app with SQLite via the standard-library `sqlite3` module. The
-database schema (`schema.sql`) is initialized automatically on startup.
+database schema (`schema.sql`) is initialized, and migrations applied, when
+running `python server.py`; under Gunicorn, run `flask --app server init-db`
+first (see `deployment.md`).
 Feed fetching and parsing is handled server-side by `feedparser`.
 
 Static assets (`app.js`, `api.js`, `render.js`, `login.js`, `style.css`)
