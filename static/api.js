@@ -16,6 +16,26 @@ async function apiFetch(path, options = {}) {
 }
 
 /**
+ * Turn a response carrying a feed into `{ feed }` or `{ error }`. Errors from
+ * the app are JSON, but a proxy in front of it (e.g. nginx returning 502 when
+ * the app is down or times out) sends an HTML page instead, so don't assume
+ * the body parses.
+ * @param {Response|null} res - From apiFetch; null after a 401 redirect.
+ * @returns {Promise<{feed?: Object, error?: string}>}
+ */
+async function feedResult(res) {
+    if (!res) return { error: "Not authenticated" };
+    let data = null;
+    try {
+        data = await res.json();
+    } catch {
+        // Not JSON; fall through to a generic error.
+    }
+    if (res.ok && data) return { feed: data };
+    return { error: data?.error ?? `Server error: ${res.status} ${res.statusText}` };
+}
+
+/**
  * Load all feeds (with items) for the current user.
  * @returns {Promise<Array>}
  */
@@ -30,13 +50,15 @@ export async function getFeeds() {
  * @returns {Promise<{feed?: Object, error?: string}>}
  */
 export async function addFeed(url) {
-    const res = await apiFetch("/api/feeds", {
-        method: "POST",
-        body: JSON.stringify({ url }),
-    });
-    if (!res) return { error: "Not authenticated" };
-    const data = await res.json();
-    return res.ok ? { feed: data } : { error: data.error };
+    try {
+        const res = await apiFetch("/api/feeds", {
+            method: "POST",
+            body: JSON.stringify({ url }),
+        });
+        return await feedResult(res);
+    } catch {
+        return { error: "Could not reach the server" };
+    }
 }
 
 /**
@@ -55,10 +77,12 @@ export async function removeFeed(feedId) {
  * @returns {Promise<{feed?: Object, error?: string}>}
  */
 export async function refreshFeed(feedId) {
-    const res = await apiFetch(`/api/feeds/${feedId}/refresh`, { method: "POST" });
-    if (!res) return { error: "Not authenticated" };
-    const data = await res.json();
-    return res.ok ? { feed: data } : { error: data.error };
+    try {
+        const res = await apiFetch(`/api/feeds/${feedId}/refresh`, { method: "POST" });
+        return await feedResult(res);
+    } catch {
+        return { error: "Could not reach the server" };
+    }
 }
 
 /**
